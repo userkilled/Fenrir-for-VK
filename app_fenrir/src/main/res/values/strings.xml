@@ -132,6 +132,16 @@
         <item>6</item>
     </string-array>
 
+    <string-array name="picasso_dispatcher_names" translatable="false">
+        <item>Handler</item>
+        <item>Coroutine</item>
+    </string-array>
+
+    <string-array name="picasso_dispatcher_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+
     <string-array name="array_photo_rounded_names">
         <item>Always rounded</item>
         <item>Rounded if one photo</item>
@@ -291,6 +301,7 @@
     <string name="general_settings">Commons</string>
     <string name="about_settings">About application</string>
     <string name="account_cache_cleaner">Clear cache and sql</string>
+    <string name="ask_account_cache_cleaner">Do clear cache and sql?</string>
     <string name="cache_cleaner">Clear cache</string>
     <!-- Quick Reply-->
     <string name="go_to_dialog">To dialog</string>
@@ -318,7 +329,7 @@
     <string name="attachment_link">Link</string>
     <string name="user_type_message">typing message</string>
     <string name="user_type_voice">typing voice</string>
-    <string name="many_users_typed">%1$s and %2$d persons</string>
+    <string name="many_users_typed">%1$s and %2$d</string>
 
     <string name="load_more">Load more</string>
     <string name="last_seen_sex_man">was: %1$s</string>
@@ -932,7 +943,7 @@
     <string name="attachments_in_chat">Chat materials</string>
     <string name="attachments_in_wall">Wall materials</string>
     <string name="messages_in_json">Chat JSON (%1$d messages)</string>
-    <string name="change_hrono_history">Show start</string>
+    <string name="change_chrono_history">Show start</string>
     <string name="show_profile">Profile</string>
     <string name="unknown_photos_count">unknown</string>
     <string name="photos_count">%1$d photo</string>
@@ -1252,7 +1263,6 @@
     <string name="vk_photos_tab_title">Photo VK</string>
     <string name="local_photos_tab_title">Local photos</string>
     <string name="local_gallery_tab_title">Gallery</string>
-    <string name="send_short">Send</string>
     <string name="message_attachment_empty_text">No attachments yet (limit 10)</string>
     <string name="button_add_photo">Add photo/video</string>
     <string name="log_type_error">Exceptions</string>
@@ -1641,6 +1651,7 @@
     <string name="be_online">Stay online</string>
     <string name="wall_attachments">Wall attachments</string>
     <string name="posts_analized">%1$d posts checked</string>
+    <string name="messages_analized">%1$d messages checked</string>
     <string name="comments_analized">%1$d comments checked</string>
     <string name="photo_rounded_view">Round image edges</string>
     <string name="font_size">Font size</string>
@@ -1743,7 +1754,7 @@
     <string name="do_auto_play_video">Auto select video quality</string>
     <string name="video_not_have_link">Video has no link</string>
     <string name="change_upload_size">Show picture sending quality settings</string>
-    <string name="wall_themed">Wall decoration for pagans</string>
+    <string name="wall_themed">Pagan decoration</string>
     <string name="runes_show">Show runes</string>
     <string name="pagan_symbol">Symbol</string>
     <string name="photo_settings">Viewing photos</string>
@@ -1913,7 +1924,6 @@
     <string name="reset_settings">Reset Settings</string>
     <string name="wrong_settings_format">This setting format is not supported!</string>
     <string name="settings_for_another_client">The settings for a cat are not suitable for a regular client and vice versa!</string>
-    <string name="ongoing_player_notification">Continuous notification</string>
     <string name="group_members">Group Members</string>
     <string name="donut">Donut</string>
     <string name="all">All</string>
@@ -1956,4 +1966,12 @@
     <string name="clips">Clips</string>
     <string name="stories">Stories</string>
     <string name="account_not_registered">Account not registered!</string>
+    <string name="disable_unvote">Disable unvote</string>
+    <string name="empty_background">Empty Background</string>
+    <string name="remember">Remember</string>
+    <string name="instant_photo_display">Instant photo display</string>
+    <string name="picasso_dispatcher" translatable="false">Picasso3 dispatcher</string>
+    <string name="select_more">Select More…</string>
+    <string name="chat_popup_menu">Popup Menu in chat</string>
+    <string name="reactions">Reactions</string>
 </resources>

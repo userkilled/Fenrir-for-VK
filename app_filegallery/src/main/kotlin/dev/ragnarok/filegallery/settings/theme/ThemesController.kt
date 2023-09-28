@@ -39,6 +39,17 @@ object ThemesController {
             R.style.App_DayNight_ColdGreen_MD1
         ),
         ThemeValue(
+            "coffee_pistachio",
+            "#9B5D56",
+            "#8EBD9D",
+            "#E0BCA0",
+            "#BEDAC3",
+            "Coffee Pistachio",
+            R.style.App_DayNight_CoffeePistachio,
+            R.style.App_DayNight_CoffeePistachio_Amoled,
+            R.style.App_DayNight_CoffeePistachio_MD1
+        ),
+        ThemeValue(
             "ice",
             "#448AFF",
             "#1E88E5",
@@ -150,7 +161,7 @@ object ThemesController {
             "contrast",
             "#000000",
             "#444444",
-            "#FFFFFF",
+            "#ffffff",
             "#777777",
             "Contrast",
             R.style.App_DayNight_Contrast,
@@ -315,7 +326,7 @@ object ThemesController {
     )
 
     fun getCurrentTheme(): ThemeValue {
-        val key: String = Settings.get().main().getMainThemeKey()
+        val key: String = Settings.get().main().mainThemeKey
 
         if (key == "random") {
             return randomTheme
@@ -335,7 +346,7 @@ object ThemesController {
     @StyleRes
     fun currentStyle(): Int {
         val t = getCurrentTheme()
-        return when (Settings.get().main().getThemeOverlay()) {
+        return when (Settings.get().main().themeOverlay) {
             ThemeOverlay.AMOLED -> {
                 t.themeAmoledRes
             }

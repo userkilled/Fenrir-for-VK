@@ -65,15 +65,18 @@ class PicassoInstance @SuppressLint("CheckResult") private constructor(
                     .addHeader("User-Agent", Constants.USER_AGENT).build()
                 chain.proceed(request)
             })
-        BitmapSafeResize.setMaxResolution(Settings.get().main().getMaxBitmapResolution())
-        BitmapSafeResize.setHardwareRendering(Settings.get().main().getRendering_mode())
-        CoverSafeResize.setMaxResolution(Settings.get().main().getMaxThumbResolution())
-        return Picasso.Builder(app)
+        BitmapSafeResize.setMaxResolution(Settings.get().main().maxBitmapResolution)
+        BitmapSafeResize.setHardwareRendering(Settings.get().main().rendering_mode)
+        CoverSafeResize.setMaxResolution(Settings.get().main().maxThumbResolution)
+        val picassoBuilder = Picasso.Builder(app)
             .defaultBitmapConfig(Bitmap.Config.ARGB_8888)
             .client(builder.build())
             .withCacheSize(calculateMemoryCacheSize(app))
             .addRequestHandler(PicassoFileManagerHandler(app))
-            .build()
+        if (Settings.get().main().picassoDispatcher == 1) {
+            picassoBuilder.dispatchers()
+        }
+        return picassoBuilder.build()
     }
 
     fun clear_cache() {

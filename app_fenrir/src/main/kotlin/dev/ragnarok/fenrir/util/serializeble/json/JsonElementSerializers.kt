@@ -6,17 +6,26 @@
 package dev.ragnarok.fenrir.util.serializeble.json
 
 import dev.ragnarok.fenrir.util.serializeble.json.internal.JsonDecodingException
-import kotlinx.serialization.*
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.descriptors.PolymorphicKind
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.buildSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
  * Serializer object providing [SerializationStrategy] and [DeserializationStrategy] for [JsonElement].
- * It can only be used by with [Json] format an its input ([JsonDecoder] and [JsonEncoder]).
+ * It can only be used by with [Json] format and its input ([JsonDecoder] and [JsonEncoder]).
  * Currently, this hierarchy has no guarantees on descriptor content.
  *
  * Example usage:
@@ -137,7 +146,9 @@ private object JsonLiteralSerializer : KSerializer<JsonLiteral> {
             return encoder.encodeInline(value.coerceToInlineType).encodeString(value.content)
         }
 
-        value.longOrNull?.let { return encoder.encodeLong(it) }
+        // use .content instead of .longOrNull as latter can process exponential notation,
+        // and it should be delegated to double when encoding.
+        value.content.toLongOrNull()?.let { return encoder.encodeLong(it) }
 
         // most unsigned values fit to .longOrNull, but not ULong
         value.content.toULongOrNull()?.let {
@@ -145,8 +156,8 @@ private object JsonLiteralSerializer : KSerializer<JsonLiteral> {
             return
         }
 
-        value.doubleOrNull?.let { return encoder.encodeDouble(it) }
-        value.booleanOrNull?.let { return encoder.encodeBoolean(it) }
+        value.content.toDoubleOrNull()?.let { return encoder.encodeDouble(it) }
+        value.content.toBooleanStrictOrNull()?.let { return encoder.encodeBoolean(it) }
 
         encoder.encodeString(value.content)
     }

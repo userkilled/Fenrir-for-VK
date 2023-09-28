@@ -53,7 +53,7 @@
 
   <!-- Style for Material3 NavigationView. -->
   <style name="Widget.Material3.NavigationView" parent="Widget.MaterialComponents.NavigationView">
-    <item name="android:background">@macro/m3_comp_navigation_drawer_container_color</item>
+    <item name="android:background">@macro/m3_comp_navigation_drawer_modal_container_color</item>
     <item name="android:maxWidth">@dimen/m3_comp_navigation_drawer_container_width</item>
     <item name="subheaderColor">@macro/m3_comp_navigation_drawer_headline_color</item>
     <item name="subheaderTextAppearance">@macro/m3_comp_navigation_drawer_headline_type</item>
@@ -80,6 +80,7 @@
     <item name="subheaderInsetStart">@dimen/m3_navigation_menu_headline_horizontal_padding</item>
     <item name="subheaderInsetEnd">@dimen/m3_navigation_menu_headline_horizontal_padding</item>
     <item name="drawerLayoutCornerSize">@dimen/m3_navigation_drawer_layout_corner_size</item>
+    <item name="activeIndicatorLabelPadding">@dimen/m3_navigation_item_active_indicator_label_padding</item>
   </style>
 
   <style name="ShapeAppearanceOverlay.Material3.NavigationView.Item"

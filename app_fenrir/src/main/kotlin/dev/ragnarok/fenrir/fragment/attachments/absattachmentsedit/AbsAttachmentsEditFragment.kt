@@ -28,13 +28,17 @@ import dev.ragnarok.fenrir.activity.PhotoAlbumsActivity
 import dev.ragnarok.fenrir.activity.PhotosActivity
 import dev.ragnarok.fenrir.db.model.AttachmentsTypes
 import dev.ragnarok.fenrir.fragment.base.BaseMvpFragment
-import dev.ragnarok.fenrir.fragment.createpoll.CreatePollFragment
-import dev.ragnarok.fenrir.fragment.vkphotos.IVKPhotosView
+import dev.ragnarok.fenrir.fragment.photos.vkphotos.IVKPhotosView
+import dev.ragnarok.fenrir.fragment.poll.createpoll.CreatePollFragment
 import dev.ragnarok.fenrir.getParcelableArrayListExtraCompat
 import dev.ragnarok.fenrir.getParcelableCompat
 import dev.ragnarok.fenrir.listener.BackPressCallback
 import dev.ragnarok.fenrir.listener.TextWatcherAdapter
-import dev.ragnarok.fenrir.model.*
+import dev.ragnarok.fenrir.model.AbsModel
+import dev.ragnarok.fenrir.model.AttachmentEntry
+import dev.ragnarok.fenrir.model.LocalPhoto
+import dev.ragnarok.fenrir.model.Photo
+import dev.ragnarok.fenrir.model.Poll
 import dev.ragnarok.fenrir.place.PlaceFactory.getCreatePollPlace
 import dev.ragnarok.fenrir.upload.Upload
 import dev.ragnarok.fenrir.util.Action
@@ -342,12 +346,19 @@ abstract class AbsAttachmentsEditFragment<P : AbsAttachmentsEditPresenter<V>, V 
         }
     }
 
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        parentFragmentManager.setFragmentResultListener(
+            CreatePollFragment.REQUEST_CREATE_POLL,
+            this
+        ) { _: String?, result: Bundle ->
+            val poll: Poll = result.getParcelableCompat("poll") ?: return@setFragmentResultListener
+            presenter?.firePollCreated(poll)
+        }
+    }
+
     override fun openPollCreationWindow(accountId: Long, ownerId: Long) {
         getCreatePollPlace(accountId, ownerId)
-            .setFragmentListener(CreatePollFragment.REQUEST_CREATE_POLL) { _: String?, result: Bundle ->
-                val poll: Poll = result.getParcelableCompat("poll") ?: return@setFragmentListener
-                presenter?.firePollCreated(poll)
-            }
             .tryOpenWith(requireActivity())
     }
 

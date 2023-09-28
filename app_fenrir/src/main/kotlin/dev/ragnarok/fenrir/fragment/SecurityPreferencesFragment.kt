@@ -18,7 +18,15 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import de.maxr1998.modernpreferences.AbsPreferencesFragment
 import de.maxr1998.modernpreferences.PreferenceScreen
 import de.maxr1998.modernpreferences.PreferencesAdapter
-import de.maxr1998.modernpreferences.helpers.*
+import de.maxr1998.modernpreferences.helpers.DEFAULT_RES_ID
+import de.maxr1998.modernpreferences.helpers.collapse
+import de.maxr1998.modernpreferences.helpers.onCheckedBeforeChange
+import de.maxr1998.modernpreferences.helpers.onCheckedChange
+import de.maxr1998.modernpreferences.helpers.onClick
+import de.maxr1998.modernpreferences.helpers.pref
+import de.maxr1998.modernpreferences.helpers.screen
+import de.maxr1998.modernpreferences.helpers.singleChoice
+import de.maxr1998.modernpreferences.helpers.switch
 import de.maxr1998.modernpreferences.preferences.TwoStatePreference
 import dev.ragnarok.fenrir.R
 import dev.ragnarok.fenrir.activity.ActivityFeatures
@@ -26,7 +34,7 @@ import dev.ragnarok.fenrir.activity.ActivityUtils
 import dev.ragnarok.fenrir.activity.CreatePinActivity
 import dev.ragnarok.fenrir.crypt.KeyLocationPolicy
 import dev.ragnarok.fenrir.db.Stores
-import dev.ragnarok.fenrir.fragment.createpin.CreatePinFragment
+import dev.ragnarok.fenrir.fragment.pin.createpin.CreatePinFragment
 import dev.ragnarok.fenrir.fromIOToMain
 import dev.ragnarok.fenrir.listener.BackPressCallback
 import dev.ragnarok.fenrir.listener.CanBackPressedCallback
@@ -199,7 +207,7 @@ class SecurityPreferencesFragment : AbsPreferencesFragment(),
                 titleRes = R.string.use_pin_for_security_title
                 onCheckedBeforeChange {
                     if (it) {
-                        if (!Settings.get().security().hasPinHash()) {
+                        if (!Settings.get().security().hasPinHash) {
                             startCreatePinActivity(this)
                             false
                         } else {

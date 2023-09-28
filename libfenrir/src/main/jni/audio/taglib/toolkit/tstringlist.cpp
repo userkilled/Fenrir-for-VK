@@ -27,9 +27,8 @@
 
 using namespace TagLib;
 
-class StringListPrivate
+class StringList::StringListPrivate
 {
-
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -55,14 +54,20 @@ StringList StringList::split(const String &s, const String &pattern)
 // public members
 ////////////////////////////////////////////////////////////////////////////////
 
-StringList::StringList()
-{
+StringList::StringList() = default;
 
+StringList::StringList(const StringList &l) :
+  List<String>(l)
+{
 }
 
-StringList::StringList(const StringList &l) : List<String>(l)
+StringList &StringList::operator=(const StringList &l)
 {
+  if(this == &l)
+    return *this;
 
+  List<String>::operator=(l);
+  return *this;
 }
 
 StringList::StringList(const String &s)
@@ -72,28 +77,20 @@ StringList::StringList(const String &s)
 
 StringList::StringList(const ByteVectorList &bl, String::Type t)
 {
-  ByteVectorList::ConstIterator i = bl.begin();
-  for(;i != bl.end(); i++) {
-    append(String(*i, t));
+  for(const auto &byte : bl) {
+    append(String(byte, t));
   }
 }
 
-StringList::~StringList()
-{
-
-}
+StringList::~StringList() = default;
 
 String StringList::toString(const String &separator) const
 {
   String s;
 
-  ConstIterator it = begin();
-  ConstIterator itEnd = end();
-
-  while(it != itEnd) {
+  for(auto it = begin(); it != end(); ++it) {
     s += *it;
-    it++;
-    if(it != itEnd)
+    if(std::next(it) != end())
       s += separator;
   }
 

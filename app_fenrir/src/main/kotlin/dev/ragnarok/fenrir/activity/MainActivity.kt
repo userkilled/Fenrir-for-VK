@@ -3,13 +3,23 @@ package dev.ragnarok.fenrir.activity
 import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
 import android.app.Activity
-import android.content.*
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.ComponentName
+import android.content.Context
+import android.content.DialogInterface
+import android.content.Intent
+import android.content.ServiceConnection
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
-import android.view.*
+import android.view.MenuItem
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
 import android.view.animation.LinearInterpolator
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.OnBackPressedCallback
@@ -18,6 +28,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.ColorInt
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentContainerView
@@ -29,11 +40,14 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationBarView
 import com.google.android.material.snackbar.BaseTransientBottomBar
-import dev.ragnarok.fenrir.*
+import dev.ragnarok.fenrir.AccountType
+import dev.ragnarok.fenrir.Extra
+import dev.ragnarok.fenrir.Includes
 import dev.ragnarok.fenrir.Includes.networkInterfaces
 import dev.ragnarok.fenrir.Includes.provideMainThreadScheduler
 import dev.ragnarok.fenrir.Includes.proxySettings
 import dev.ragnarok.fenrir.Includes.pushRegistrationResolver
+import dev.ragnarok.fenrir.R
 import dev.ragnarok.fenrir.activity.ActivityUtils.checkInputExist
 import dev.ragnarok.fenrir.activity.ActivityUtils.isMimeAudio
 import dev.ragnarok.fenrir.activity.EnterPinActivity.Companion.getClass
@@ -46,9 +60,12 @@ import dev.ragnarok.fenrir.db.Stores
 import dev.ragnarok.fenrir.dialog.ResolveDomainDialog
 import dev.ragnarok.fenrir.domain.InteractorFactory
 import dev.ragnarok.fenrir.domain.impl.CountersInteractor
-import dev.ragnarok.fenrir.fragment.*
+import dev.ragnarok.fenrir.fragment.BrowserFragment
+import dev.ragnarok.fenrir.fragment.DocPreviewFragment
+import dev.ragnarok.fenrir.fragment.NotificationPreferencesFragment
+import dev.ragnarok.fenrir.fragment.PreferencesFragment
 import dev.ragnarok.fenrir.fragment.PreferencesFragment.Companion.cleanCache
-import dev.ragnarok.fenrir.fragment.abswall.AbsWallFragment
+import dev.ragnarok.fenrir.fragment.SecurityPreferencesFragment
 import dev.ragnarok.fenrir.fragment.attachments.commentcreate.CommentCreateFragment
 import dev.ragnarok.fenrir.fragment.attachments.commentedit.CommentEditFragment
 import dev.ragnarok.fenrir.fragment.attachments.postcreate.PostCreateFragment
@@ -64,37 +81,35 @@ import dev.ragnarok.fenrir.fragment.audio.catalog_v2.lists.CatalogV2ListFragment
 import dev.ragnarok.fenrir.fragment.audio.catalog_v2.sections.CatalogV2SectionFragment
 import dev.ragnarok.fenrir.fragment.comments.CommentsFragment
 import dev.ragnarok.fenrir.fragment.communities.CommunitiesFragment
-import dev.ragnarok.fenrir.fragment.communitycontrol.CommunityControlFragment
-import dev.ragnarok.fenrir.fragment.communitycontrol.communityban.CommunityBanEditFragment
-import dev.ragnarok.fenrir.fragment.communitycontrol.communityinfocontacts.CommunityInfoContactsFragment
-import dev.ragnarok.fenrir.fragment.communitycontrol.communityinfolinks.CommunityInfoLinksFragment
-import dev.ragnarok.fenrir.fragment.communitycontrol.communitymanageredit.CommunityManagerEditFragment
-import dev.ragnarok.fenrir.fragment.communitycontrol.communitymembers.CommunityMembersFragment
-import dev.ragnarok.fenrir.fragment.conversation.ConversationFragmentFactory
-import dev.ragnarok.fenrir.fragment.createphotoalbum.CreatePhotoAlbumFragment
-import dev.ragnarok.fenrir.fragment.createpin.CreatePinFragment
-import dev.ragnarok.fenrir.fragment.createpoll.CreatePollFragment
+import dev.ragnarok.fenrir.fragment.communities.communitycontrol.CommunityControlFragment
+import dev.ragnarok.fenrir.fragment.communities.communitycontrol.communityban.CommunityBanEditFragment
+import dev.ragnarok.fenrir.fragment.communities.communitycontrol.communityinfocontacts.CommunityInfoContactsFragment
+import dev.ragnarok.fenrir.fragment.communities.communitycontrol.communityinfolinks.CommunityInfoLinksFragment
+import dev.ragnarok.fenrir.fragment.communities.communitycontrol.communitymanageredit.CommunityManagerEditFragment
+import dev.ragnarok.fenrir.fragment.communities.communitycontrol.communitymembers.CommunityMembersFragment
+import dev.ragnarok.fenrir.fragment.communities.groupchats.GroupChatsFragment
 import dev.ragnarok.fenrir.fragment.docs.DocsFragment
 import dev.ragnarok.fenrir.fragment.docs.DocsListPresenter
 import dev.ragnarok.fenrir.fragment.fave.FaveTabsFragment
 import dev.ragnarok.fenrir.fragment.feed.FeedFragment
+import dev.ragnarok.fenrir.fragment.feed.feedbanned.FeedBannedFragment
+import dev.ragnarok.fenrir.fragment.feed.newsfeedcomments.NewsfeedCommentsFragment
+import dev.ragnarok.fenrir.fragment.feed.newsfeedmentions.NewsfeedMentionsFragment
 import dev.ragnarok.fenrir.fragment.feedback.FeedbackFragment
-import dev.ragnarok.fenrir.fragment.feedbackvkofficial.FeedbackVKOfficialFragment
-import dev.ragnarok.fenrir.fragment.feedbanned.FeedBannedFragment
+import dev.ragnarok.fenrir.fragment.feedback.feedbackvkofficial.FeedbackVKOfficialFragment
 import dev.ragnarok.fenrir.fragment.friends.birthday.BirthDayFragment
 import dev.ragnarok.fenrir.fragment.friends.friendsbyphones.FriendsByPhonesFragment
 import dev.ragnarok.fenrir.fragment.friends.friendstabs.FriendsTabsFragment
 import dev.ragnarok.fenrir.fragment.gifts.GiftsFragment
-import dev.ragnarok.fenrir.fragment.groupchats.GroupChatsFragment
 import dev.ragnarok.fenrir.fragment.likes.LikesFragment
 import dev.ragnarok.fenrir.fragment.likes.storiesview.StoriesViewFragment
 import dev.ragnarok.fenrir.fragment.localserver.filemanagerremote.FileManagerRemoteFragment
 import dev.ragnarok.fenrir.fragment.localserver.photoslocalserver.PhotosLocalServerFragment
 import dev.ragnarok.fenrir.fragment.logs.LogsFragment
-import dev.ragnarok.fenrir.fragment.marketview.MarketViewFragment
 import dev.ragnarok.fenrir.fragment.messages.chat.ChatFragment
 import dev.ragnarok.fenrir.fragment.messages.chat.ChatFragment.Companion.newInstance
 import dev.ragnarok.fenrir.fragment.messages.chatmembers.ChatMembersFragment
+import dev.ragnarok.fenrir.fragment.messages.conversationattachments.ConversationFragmentFactory
 import dev.ragnarok.fenrir.fragment.messages.dialogs.DialogsFragment
 import dev.ragnarok.fenrir.fragment.messages.fwds.FwdsFragment
 import dev.ragnarok.fenrir.fragment.messages.importantmessages.ImportantMessagesFragment
@@ -103,13 +118,19 @@ import dev.ragnarok.fenrir.fragment.messages.notreadmessages.NotReadMessagesFrag
 import dev.ragnarok.fenrir.fragment.narratives.NarrativesFragment
 import dev.ragnarok.fenrir.fragment.navigationedit.DrawerEditFragment
 import dev.ragnarok.fenrir.fragment.navigationedit.SideDrawerEditFragment
-import dev.ragnarok.fenrir.fragment.newsfeedcomments.NewsfeedCommentsFragment
-import dev.ragnarok.fenrir.fragment.newsfeedmentions.NewsfeedMentionsFragment
 import dev.ragnarok.fenrir.fragment.ownerarticles.OwnerArticlesFragment
-import dev.ragnarok.fenrir.fragment.photoallcomment.PhotoAllCommentFragment
+import dev.ragnarok.fenrir.fragment.photos.createphotoalbum.CreatePhotoAlbumFragment
+import dev.ragnarok.fenrir.fragment.photos.photoallcomment.PhotoAllCommentFragment
+import dev.ragnarok.fenrir.fragment.photos.vkphotoalbums.VKPhotoAlbumsFragment
+import dev.ragnarok.fenrir.fragment.photos.vkphotos.IVKPhotosView
+import dev.ragnarok.fenrir.fragment.photos.vkphotos.VKPhotosFragment
+import dev.ragnarok.fenrir.fragment.pin.createpin.CreatePinFragment
 import dev.ragnarok.fenrir.fragment.poll.PollFragment
-import dev.ragnarok.fenrir.fragment.productalbums.ProductAlbumsFragment
+import dev.ragnarok.fenrir.fragment.poll.createpoll.CreatePollFragment
+import dev.ragnarok.fenrir.fragment.poll.voters.VotersFragment
 import dev.ragnarok.fenrir.fragment.products.ProductsFragment
+import dev.ragnarok.fenrir.fragment.products.marketview.MarketViewFragment
+import dev.ragnarok.fenrir.fragment.products.productalbums.ProductAlbumsFragment
 import dev.ragnarok.fenrir.fragment.requestexecute.RequestExecuteFragment
 import dev.ragnarok.fenrir.fragment.search.AudioSearchTabsFragment
 import dev.ragnarok.fenrir.fragment.search.SearchTabsFragment
@@ -119,21 +140,27 @@ import dev.ragnarok.fenrir.fragment.shortedlinks.ShortedLinksFragment
 import dev.ragnarok.fenrir.fragment.theme.ThemeFragment
 import dev.ragnarok.fenrir.fragment.topics.TopicsFragment
 import dev.ragnarok.fenrir.fragment.userbanned.UserBannedFragment
-import dev.ragnarok.fenrir.fragment.userdetails.UserDetailsFragment.Companion.newInstance
-import dev.ragnarok.fenrir.fragment.videoalbumsbyvideo.VideoAlbumsByVideoFragment
-import dev.ragnarok.fenrir.fragment.videopreview.VideoPreviewFragment
 import dev.ragnarok.fenrir.fragment.videos.IVideosListView
 import dev.ragnarok.fenrir.fragment.videos.VideosFragment
 import dev.ragnarok.fenrir.fragment.videos.VideosTabsFragment
-import dev.ragnarok.fenrir.fragment.vkphotoalbums.VKPhotoAlbumsFragment
-import dev.ragnarok.fenrir.fragment.vkphotos.IVKPhotosView
-import dev.ragnarok.fenrir.fragment.vkphotos.VKPhotosFragment
-import dev.ragnarok.fenrir.fragment.voters.VotersFragment
-import dev.ragnarok.fenrir.fragment.wallattachments.WallAttachmentsFragmentFactory
-import dev.ragnarok.fenrir.fragment.wallattachments.wallsearchcommentsattachments.WallSearchCommentsAttachmentsFragment
-import dev.ragnarok.fenrir.fragment.wallpost.WallPostFragment
+import dev.ragnarok.fenrir.fragment.videos.videoalbumsbyvideo.VideoAlbumsByVideoFragment
+import dev.ragnarok.fenrir.fragment.videos.videopreview.VideoPreviewFragment
+import dev.ragnarok.fenrir.fragment.wall.AbsWallFragment
+import dev.ragnarok.fenrir.fragment.wall.userdetails.UserDetailsFragment.Companion.newInstance
+import dev.ragnarok.fenrir.fragment.wall.wallattachments.WallAttachmentsFragmentFactory
+import dev.ragnarok.fenrir.fragment.wall.wallattachments.wallsearchcommentsattachments.WallSearchCommentsAttachmentsFragment
+import dev.ragnarok.fenrir.fragment.wall.wallpost.WallPostFragment
+import dev.ragnarok.fenrir.fromIOToMain
+import dev.ragnarok.fenrir.getParcelableArrayListCompat
+import dev.ragnarok.fenrir.getParcelableArrayListExtraCompat
+import dev.ragnarok.fenrir.getParcelableCompat
+import dev.ragnarok.fenrir.getParcelableExtraCompat
 import dev.ragnarok.fenrir.link.LinkHelper
-import dev.ragnarok.fenrir.listener.*
+import dev.ragnarok.fenrir.listener.AppStyleable
+import dev.ragnarok.fenrir.listener.BackPressCallback
+import dev.ragnarok.fenrir.listener.CanBackPressedCallback
+import dev.ragnarok.fenrir.listener.OnSectionResumeCallback
+import dev.ragnarok.fenrir.listener.UpdatableNavigation
 import dev.ragnarok.fenrir.media.music.MusicPlaybackController
 import dev.ragnarok.fenrir.media.music.MusicPlaybackController.ServiceToken
 import dev.ragnarok.fenrir.media.music.MusicPlaybackController.bindToServiceWithoutStart
@@ -143,14 +170,20 @@ import dev.ragnarok.fenrir.media.music.MusicPlaybackController.unbindFromService
 import dev.ragnarok.fenrir.media.music.MusicPlaybackService
 import dev.ragnarok.fenrir.media.music.MusicPlaybackService.Companion.startForPlayList
 import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.ModalBottomSheetDialogFragment
-import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.Option
 import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.OptionRequest
-import dev.ragnarok.fenrir.model.*
+import dev.ragnarok.fenrir.model.Audio
+import dev.ragnarok.fenrir.model.Banned
+import dev.ragnarok.fenrir.model.Comment
+import dev.ragnarok.fenrir.model.Document
+import dev.ragnarok.fenrir.model.Manager
+import dev.ragnarok.fenrir.model.Peer
+import dev.ragnarok.fenrir.model.SectionCounters
+import dev.ragnarok.fenrir.model.User
+import dev.ragnarok.fenrir.model.UserDetails
 import dev.ragnarok.fenrir.model.drawer.AbsMenuItem
 import dev.ragnarok.fenrir.model.drawer.RecentChat
 import dev.ragnarok.fenrir.model.drawer.SectionMenuItem
-import dev.ragnarok.fenrir.module.FenrirNative
-import dev.ragnarok.fenrir.module.thorvg.ThorVGRender
+import dev.ragnarok.fenrir.nonNullNoEmpty
 import dev.ragnarok.fenrir.place.Place
 import dev.ragnarok.fenrir.place.PlaceFactory
 import dev.ragnarok.fenrir.place.PlaceProvider
@@ -160,10 +193,17 @@ import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.settings.SwipesChatMode
 import dev.ragnarok.fenrir.settings.theme.ThemesController.currentStyle
 import dev.ragnarok.fenrir.settings.theme.ThemesController.nextRandom
+import dev.ragnarok.fenrir.toMainThread
 import dev.ragnarok.fenrir.upload.UploadUtils
-import dev.ragnarok.fenrir.util.*
+import dev.ragnarok.fenrir.util.Accounts
+import dev.ragnarok.fenrir.util.Action
+import dev.ragnarok.fenrir.util.HelperSimple
 import dev.ragnarok.fenrir.util.HelperSimple.needHelp
+import dev.ragnarok.fenrir.util.Logger
+import dev.ragnarok.fenrir.util.MainActivityTransforms
+import dev.ragnarok.fenrir.util.Pair
 import dev.ragnarok.fenrir.util.Pair.Companion.create
+import dev.ragnarok.fenrir.util.Utils
 import dev.ragnarok.fenrir.util.rxutils.RxUtils
 import dev.ragnarok.fenrir.util.toast.CustomSnackbars
 import dev.ragnarok.fenrir.util.toast.CustomToast.Companion.createCustomToast
@@ -300,7 +340,6 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
         keyboardHide()
     }
     private var mAudioPlayServiceToken: ServiceToken? = null
-    private var isActivityDestroyed = false
 
     /**
      * First - DrawerItem, second - Clear back stack before adding
@@ -310,11 +349,11 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
     private var isZoomPhoto = false
     private val snowLayout: Int
         get() = if (Settings.get()
-                .other().is_side_navigation()
+                .main().is_side_navigation
         ) R.layout.activity_main_side_with_snow else R.layout.activity_main_with_snow
     private val normalLayout: Int
         get() = if (Settings.get()
-                .other().is_side_navigation()
+                .main().is_side_navigation
         ) R.layout.activity_main_side else R.layout.activity_main
 
     @MainActivityTransforms
@@ -350,31 +389,19 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
         }
         setTheme(currentStyle())
         Utils.prepareDensity(this)
-
-        if (FenrirNative.isNativeLoaded && getMainActivityTransform() == MainActivityTransforms.MAIN) {
-            ThorVGRender.registerColors(
-                mapOf(
-                    "primary_color" to CurrentTheme.getColorPrimary(this),
-                    "secondary_color" to CurrentTheme.getColorSecondary(this),
-                    "on_surface_color" to CurrentTheme.getColorOnSurface(this),
-                    "white_color_contrast_fix" to CurrentTheme.getColorWhiteContrastFix(this),
-                    "black_color_contrast_fix" to CurrentTheme.getColorBlackContrastFix(this)
-                )
-            )
-        }
+        Utils.registerColorsThorVG(this)
 
         super.onCreate(savedInstanceState)
-        isActivityDestroyed = false
-        isZoomPhoto = Settings.get().other().isDo_zoom_photo
+        isZoomPhoto = Settings.get().main().isDo_zoom_photo
         mCompositeDisposable.add(
             Settings.get()
                 .accounts()
-                .observeChanges()
+                .observeChanges
                 .observeOn(provideMainThreadScheduler())
                 .subscribe { onCurrentAccountChange(it) })
         mCompositeDisposable.add(
             proxySettings
-                .observeActive().observeOn(provideMainThreadScheduler())
+                .observeActive.observeOn(provideMainThreadScheduler())
                 .subscribe { stop() })
         mCompositeDisposable.add(Stores.instance
             .dialogs()
@@ -392,7 +419,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
 
         mViewFragment = findViewById(R.id.fragment)
         val anim: ObjectAnimator
-        if (mDrawerLayout != null && Settings.get().other().is_side_navigation()) {
+        if (mDrawerLayout != null && Settings.get().main().is_side_navigation) {
             navigationView?.setUp(mDrawerLayout)
             anim = ObjectAnimator.ofPropertyValuesHolder(
                 mViewFragment, PropertyValuesHolder.ofFloat(
@@ -460,13 +487,13 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
                         )
                         .fromIOToMain()
                         .subscribe(RxUtils.dummy()) { t ->
-                            if (Settings.get().other().isDeveloper_mode) {
+                            if (Settings.get().main().isDeveloper_mode) {
                                 createCustomToast(this).showToastThrowable(t)
                             }
                         })
-                    Settings.get().other().get_last_audio_sync().let {
+                    Settings.get().main().last_audio_sync.let {
                         if (it > 0 && (System.currentTimeMillis() / 1000L) - it > 900) {
-                            Settings.get().other().set_last_audio_sync(-1)
+                            Settings.get().main().set_last_audio_sync(-1)
                             mCompositeDisposable.add(
                                 Includes.stores.tempStore().deleteAudios()
                                     .fromIOToMain()
@@ -474,8 +501,8 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
                             )
                         }
                     }
-                    Settings.get().other().appStoredVersionEqual()
-                    if (Settings.get().other().isDelete_cache_images) {
+                    Settings.get().main().appStoredVersionEqual
+                    if (Settings.get().main().isDelete_cache_images) {
                         cleanCache(this, false)
                     }
                 }
@@ -508,7 +535,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
                         return
                     }
                 }
-                if (supportFragmentManager.backStackEntryCount == 1) {
+                if (supportFragmentManager.backStackEntryCount == 1 || supportFragmentManager.backStackEntryCount <= 0) {
                     if (getMainActivityTransform() != MainActivityTransforms.SWIPEBLE) {
                         if (isFragmentWithoutNavigation) {
                             openNavigationPage(AbsNavigationView.SECTION_ITEM_FEED, false)
@@ -569,13 +596,13 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
 
     private fun checkFCMRegistration(onlyCheckGMS: Boolean) {
         if (!checkPlayServices(this)) {
-            if (!Settings.get().other().isDisabledErrorFCM) {
+            if (!Settings.get().main().isDisabledErrorFCM) {
                 mViewFragment?.let {
                     CustomSnackbars.createCustomSnackbars(mViewFragment, mBottomNavigationContainer)
                         ?.setDurationSnack(BaseTransientBottomBar.LENGTH_LONG)
                         ?.themedSnack(R.string.this_device_does_not_support_fcm)
                         ?.setAction(R.string.button_access) {
-                            Settings.get().other().setDisableErrorFCM(true)
+                            Settings.get().main().setDisableErrorFCM(true)
                         }
                         ?.show()
                 }
@@ -595,7 +622,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
     }
 
     private fun bindToAudioPlayService() {
-        if (!isActivityDestroyed && mAudioPlayServiceToken == null) {
+        if (mAudioPlayServiceToken == null) {
             mAudioPlayServiceToken = bindToServiceWithoutStart(this, this)
         }
     }
@@ -610,7 +637,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
             if (!isFragmentWithoutNavigation) {
                 mToolbar?.setNavigationIcon(
                     if (Settings.get()
-                            .other().isRunes_show
+                            .main().isRunes_show
                     ) R.drawable.client_round else R.drawable.client_round_vk
                 )
                 mToolbar?.setNavigationOnClickListener {
@@ -667,87 +694,85 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
                     )
                     menus.show(
                         supportFragmentManager,
-                        "left_options",
-                        object : ModalBottomSheetDialogFragment.Listener {
-                            override fun onModalOptionSelected(option: Option) {
-                                when (option.id) {
-                                    0 -> {
-                                        mCompositeDisposable.add(InteractorFactory.createAccountInteractor()
-                                            .setOffline(
-                                                Settings.get().accounts().current
-                                            )
-                                            .fromIOToMain()
-                                            .subscribe({ onSetOffline(it) }) {
-                                                onSetOffline(
-                                                    false
-                                                )
-                                            })
-                                    }
+                        "main_activity_options"
+                    ) { _, option ->
+                        when (option.id) {
+                            0 -> {
+                                mCompositeDisposable.add(InteractorFactory.createAccountInteractor()
+                                    .setOffline(
+                                        Settings.get().accounts().current
+                                    )
+                                    .fromIOToMain()
+                                    .subscribe({ onSetOffline(it) }) {
+                                        onSetOffline(
+                                            false
+                                        )
+                                    })
+                            }
 
-                                    1 -> {
-                                        val clipBoard =
-                                            getSystemService(CLIPBOARD_SERVICE) as ClipboardManager?
-                                        if (clipBoard != null && clipBoard.primaryClip != null && (clipBoard.primaryClip?.itemCount
-                                                ?: 0) > 0 && (clipBoard.primaryClip
-                                                ?: return).getItemAt(0).text != null
-                                        ) {
-                                            val temp =
-                                                clipBoard.primaryClip?.getItemAt(0)?.text.toString()
-                                            LinkHelper.openUrl(
-                                                this@MainActivity,
-                                                mAccountId,
-                                                temp,
-                                                false
-                                            )
-                                        }
-                                    }
-
-                                    2 -> {
-                                        mCompositeDisposable.add(InteractorFactory.createStoriesInteractor()
-                                            .getStory(
-                                                Settings.get().accounts().current,
-                                                null
-                                            )
-                                            .fromIOToMain()
-                                            .subscribe({
-                                                if (it.isEmpty()) {
-                                                    createCustomToast(this@MainActivity).showToastError(
-                                                        R.string.list_is_empty
-                                                    )
-                                                }
-                                                PlaceFactory.getHistoryVideoPreviewPlace(
-                                                    mAccountId,
-                                                    ArrayList(it),
-                                                    0
-                                                ).tryOpenWith(this@MainActivity)
-                                            }) {
-                                                createCustomToast(this@MainActivity).showToastThrowable(
-                                                    it
-                                                )
-                                            })
-                                    }
-
-                                    3 -> {
-                                        PlaceFactory.getShortVideoPlace(mAccountId, null)
-                                            .tryOpenWith(this@MainActivity)
-                                    }
-
-                                    4 -> {
-                                        PlaceFactory.getPreferencesPlace(mAccountId)
-                                            .tryOpenWith(this@MainActivity)
-                                    }
-
-                                    5 -> {
-                                        val intent =
-                                            Intent(
-                                                this@MainActivity,
-                                                CameraScanActivity::class.java
-                                            )
-                                        requestQRScan.launch(intent)
-                                    }
+                            1 -> {
+                                val clipBoard =
+                                    getSystemService(CLIPBOARD_SERVICE) as ClipboardManager?
+                                if (clipBoard != null && clipBoard.primaryClip != null && (clipBoard.primaryClip?.itemCount
+                                        ?: 0) > 0 && (clipBoard.primaryClip
+                                        ?: return@show).getItemAt(0).text != null
+                                ) {
+                                    val temp =
+                                        clipBoard.primaryClip?.getItemAt(0)?.text.toString()
+                                    LinkHelper.openUrl(
+                                        this@MainActivity,
+                                        mAccountId,
+                                        temp,
+                                        false
+                                    )
                                 }
                             }
-                        })
+
+                            2 -> {
+                                mCompositeDisposable.add(InteractorFactory.createStoriesInteractor()
+                                    .getStories(
+                                        Settings.get().accounts().current,
+                                        null
+                                    )
+                                    .fromIOToMain()
+                                    .subscribe({
+                                        if (it.isEmpty()) {
+                                            createCustomToast(this@MainActivity).showToastError(
+                                                R.string.list_is_empty
+                                            )
+                                        }
+                                        PlaceFactory.getHistoryVideoPreviewPlace(
+                                            mAccountId,
+                                            ArrayList(it),
+                                            0
+                                        ).tryOpenWith(this@MainActivity)
+                                    }) {
+                                        createCustomToast(this@MainActivity).showToastThrowable(
+                                            it
+                                        )
+                                    })
+                            }
+
+                            3 -> {
+                                PlaceFactory.getShortVideoPlace(mAccountId, null)
+                                    .tryOpenWith(this@MainActivity)
+                            }
+
+                            4 -> {
+                                PlaceFactory.getPreferencesPlace(mAccountId)
+                                    .tryOpenWith(this@MainActivity)
+                            }
+
+                            5 -> {
+                                val intent =
+                                    Intent(
+                                        this@MainActivity,
+                                        CameraScanActivity::class.java
+                                    )
+                                requestQRScan.launch(intent)
+                            }
+                        }
+                    }
                 }
             } else {
                 mToolbar?.setNavigationIcon(R.drawable.arrow_left)
@@ -776,7 +801,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
         navigationView?.onAccountChange(newAccountId)
         Accounts.showAccountSwitchedToast(this)
         updateNotificationCount(newAccountId)
-        if (!Settings.get().other().isDeveloper_mode) {
+        if (!Settings.get().main().isDeveloper_mode) {
             stop()
         }
     }
@@ -959,7 +984,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
     }
 
     private fun openChat(accountId: Long, messagesOwnerId: Long, peer: Peer, closeMain: Boolean) {
-        if (Settings.get().other().isEnable_show_recent_dialogs) {
+        if (Settings.get().main().isEnable_show_recent_dialogs) {
             val recentChat = RecentChat(accountId, peer.id, peer.getTitle(), peer.avaUrl)
             navigationView?.appendRecentChat(recentChat)
             navigationView?.refreshNavigationItems()
@@ -980,8 +1005,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
                 )
                 startActivity(intent)
                 if (closeMain) {
-                    finish()
-                    overridePendingTransition(0, 0)
+                    Utils.finishActivityImmediate(this)
                 }
             } else if (Settings.get()
                     .ui().swipes_chat_mode == SwipesChatMode.SLIDR && getMainActivityTransform() != MainActivityTransforms.MAIN
@@ -1043,13 +1067,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
     }
 
     private fun clearBackStack() {
-        val manager = supportFragmentManager
-        /*if (manager.getBackStackEntryCount() > 0) {
-            FragmentManager.BackStackEntry first = manager.getBackStackEntryAt(0);
-            manager.popBackStack(first.getId(), FragmentManager.POP_BACK_STACK_INCLUSIVE);
-        }*/manager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE)
-
-        // TODO: 13.12.2017 Exception java.lang.IllegalStateException:Can not perform this action after onSaveInstanceState
+        supportFragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE)
         Logger.d(TAG, "Back stack was cleared")
     }
 
@@ -1066,7 +1084,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
         }
         mCurrentFrontSection = item
         navigationView?.selectPage(item)
-        if (Settings.get().other().isDo_not_clear_back_stack && menu && isPlaying) {
+        if (Settings.get().main().isDo_not_clear_back_stack && menu && isPlaying) {
             doClearBackStack = !doClearBackStack
         }
         if (doClearBackStack) {
@@ -1174,16 +1192,17 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
 
     override fun onDestroy() {
         mCompositeDisposable.dispose()
-        isActivityDestroyed = true
         supportFragmentManager.removeOnBackStackChangedListener(mOnBackStackChangedListener)
 
-        //if(!bNoDestroyServiceAudio)
         unbindFromAudioPlayService()
         super.onDestroy()
     }
 
     private fun unbindFromAudioPlayService() {
         if (mAudioPlayServiceToken != null) {
+            if (isChangingConfigurations) {
+                MusicPlaybackController.doNotDestroyWhenActivityRecreated()
+            }
             unbindFromService(mAudioPlayServiceToken)
             mAudioPlayServiceToken = null
         }
@@ -1253,7 +1272,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
     }
 
     override fun onChatResume(accountId: Long, peerId: Long, title: String?, imgUrl: String?) {
-        if (Settings.get().other().isEnable_show_recent_dialogs) {
+        if (Settings.get().main().isEnable_show_recent_dialogs) {
             val recentChat = RecentChat(accountId, peerId, title, imgUrl)
             navigationView?.appendRecentChat(recentChat)
             navigationView?.refreshNavigationItems()
@@ -1300,31 +1319,17 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
         val statusbarNonColored = CurrentTheme.getStatusBarNonColored(this)
         val statusbarColored = CurrentTheme.getStatusBarColor(this)
         val w = window
-        w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-        w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         w.statusBarColor = if (colored) statusbarColored else statusbarNonColored
         @ColorInt val navigationColor =
             if (colored) CurrentTheme.getNavigationBarColor(this) else Color.BLACK
         w.navigationBarColor = navigationColor
-        if (Utils.hasMarshmallow()) {
-            var flags = window.decorView.systemUiVisibility
-            flags = if (invertIcons) {
-                flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-            } else {
-                flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-            }
-            window.decorView.systemUiVisibility = flags
-        }
-        if (Utils.hasOreo()) {
-            var flags = window.decorView.systemUiVisibility
-            if (invertIcons) {
-                flags = flags or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-                w.decorView.systemUiVisibility = flags
-                w.navigationBarColor = Color.WHITE
-            } else {
-                flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
-                w.decorView.systemUiVisibility = flags
-            }
+        val ins = WindowInsetsControllerCompat(w, w.decorView)
+        ins.isAppearanceLightStatusBars = invertIcons
+        ins.isAppearanceLightNavigationBars = invertIcons
+
+        if (!Utils.hasMarshmallow()) {
+            w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+            w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         }
     }
 
@@ -1333,12 +1338,12 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
             navigationView?.closeSheet()
             navigationView?.blockSheet()
             mBottomNavigationContainer?.visibility = View.GONE
-            if (Settings.get().other().is_side_navigation()) {
+            if (Settings.get().main().is_side_navigation) {
                 findViewById<MaterialCardView>(R.id.miniplayer_side_root)?.visibility = View.GONE
             }
         } else {
             mBottomNavigationContainer?.visibility = View.VISIBLE
-            if (Settings.get().other().is_side_navigation()) {
+            if (Settings.get().main().is_side_navigation) {
                 findViewById<MaterialCardView>(R.id.miniplayer_side_root)?.visibility = View.VISIBLE
             }
             navigationView?.unblockSheet()
@@ -1417,11 +1422,8 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
             Place.EDIT_COMMENT -> {
                 val comment: Comment? = args.getParcelableCompat(Extra.COMMENT)
                 val accountId = args.getLong(Extra.ACCOUNT_ID)
-                val commemtId = args.getInt(Extra.COMMENT_ID)
-                val commentEditFragment =
-                    CommentEditFragment.newInstance(accountId, comment, commemtId)
-                place.applyFragmentListener(commentEditFragment, supportFragmentManager)
-                attachToFront(commentEditFragment)
+                val commentId = args.getInt(Extra.COMMENT_ID)
+                attachToFront(CommentEditFragment.newInstance(accountId, comment, commentId))
             }
 
             Place.EDIT_POST -> {
@@ -1456,7 +1458,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
             }
 
             Place.AUDIOS -> attachToFront(
-                if (Settings.get().other().isAudio_catalog_v2) CatalogV2ListFragment.newInstance(
+                if (Settings.get().main().isAudio_catalog_v2) CatalogV2ListFragment.newInstance(
                     args.getLong(Extra.ACCOUNT_ID),
                     args.getLong(Extra.OWNER_ID)
                 ) else AudiosTabsFragment.newInstance(
@@ -1583,9 +1585,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
             Place.UNREAD_MESSAGES -> attachToFront(NotReadMessagesFragment.newInstance(args))
             Place.SECURITY -> attachToFront(SecurityPreferencesFragment())
             Place.CREATE_POLL -> {
-                val createPollFragment = CreatePollFragment.newInstance(args)
-                place.applyFragmentListener(createPollFragment, supportFragmentManager)
-                attachToFront(createPollFragment)
+                attachToFront(CreatePollFragment.newInstance(args))
             }
 
             Place.COMMENT_CREATE -> openCommentCreatePlace(place)
@@ -1777,7 +1777,6 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
             args.getLong(Extra.OWNER_ID),
             args.getString(Extra.BODY)
         )
-        place.applyFragmentListener(fragment, supportFragmentManager)
         attachToFront(fragment)
     }
 
@@ -1788,7 +1787,7 @@ open class MainActivity : AppCompatActivity(), NavigationDrawerCallbacks, OnSect
     }
 
     override fun onServiceDisconnected(name: ComponentName) {
-        if (isActivityDestroyed) return
+        if (mAudioPlayServiceToken == null) return
         if (name.className == MusicPlaybackService::class.java.name) {
             Logger.d(TAG, "Disconnected from MusicPlaybackService")
             mAudioPlayServiceToken = null

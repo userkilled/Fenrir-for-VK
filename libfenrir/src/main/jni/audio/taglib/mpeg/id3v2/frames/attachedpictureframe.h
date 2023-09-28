@@ -26,9 +26,9 @@
 #ifndef TAGLIB_ATTACHEDPICTUREFRAME_H
 #define TAGLIB_ATTACHEDPICTUREFRAME_H
 
+#include "taglib_export.h"
 #include "id3v2frame.h"
 #include "id3v2header.h"
-#include "taglib_export.h"
 
 namespace TagLib {
 
@@ -111,12 +111,15 @@ namespace TagLib {
       /*!
        * Destroys the AttahcedPictureFrame instance.
        */
-      virtual ~AttachedPictureFrame();
+      ~AttachedPictureFrame() override;
+
+      AttachedPictureFrame(const AttachedPictureFrame &) = delete;
+      AttachedPictureFrame &operator=(const AttachedPictureFrame &) = delete;
 
       /*!
        * Returns a string containing the description and mime-type
        */
-      virtual String toString() const;
+      String toString() const override;
 
       /*!
        * Returns the text encoding used for the description.
@@ -203,23 +206,20 @@ namespace TagLib {
       void setPicture(const ByteVector &p);
 
     protected:
-      virtual void parseFields(const ByteVector &data);
-      virtual ByteVector renderFields() const;
+      void parseFields(const ByteVector &data) override;
+      ByteVector renderFields() const override;
       class AttachedPictureFramePrivate;
-      AttachedPictureFramePrivate *d;
+      std::unique_ptr<AttachedPictureFramePrivate> d;
 
     private:
-      AttachedPictureFrame(const AttachedPictureFrame &);
-      AttachedPictureFrame &operator=(const AttachedPictureFrame &);
       AttachedPictureFrame(const ByteVector &data, Header *h);
-
     };
 
     //! support for ID3v2.2 PIC frames
     class TAGLIB_EXPORT AttachedPictureFrameV22 : public AttachedPictureFrame
     {
     protected:
-      virtual void parseFields(const ByteVector &data);
+      void parseFields(const ByteVector &data) override;
     private:
       AttachedPictureFrameV22(const ByteVector &data, Header *h);
       friend class FrameFactory;

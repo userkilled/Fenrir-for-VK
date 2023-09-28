@@ -15,6 +15,7 @@ import androidx.annotation.ColorInt
 import androidx.annotation.LayoutRes
 import androidx.annotation.StringRes
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.snackbar.Snackbar
@@ -41,6 +42,7 @@ import dev.ragnarok.fenrir.settings.CurrentTheme
 import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.util.AppPerms.requestPermissionsAbs
 import dev.ragnarok.fenrir.util.AppTextUtils
+import dev.ragnarok.fenrir.util.DownloadWorkUtils
 import dev.ragnarok.fenrir.util.HelperSimple
 import dev.ragnarok.fenrir.util.Utils
 import dev.ragnarok.fenrir.util.ViewUtils
@@ -139,16 +141,6 @@ class ShortVideoPagerActivity : BaseMvpActivity<ShortVideoPagerPresenter, IShort
         } else {
             mHelper?.visibility = View.GONE
         }
-        mViewPager?.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-            override fun onPageSelected(position: Int) {
-                super.onPageSelected(position)
-                playDispose.dispose()
-                playDispose = Observable.just(Object())
-                    .delay(400, TimeUnit.MILLISECONDS)
-                    .toMainThread()
-                    .subscribe { presenter?.firePageSelected(position) }
-            }
-        })
         mDownload = findViewById(R.id.button_download)
         mShare = findViewById(R.id.button_share)
         mShare?.setOnClickListener { presenter?.fireShareButtonClick() }
@@ -192,8 +184,7 @@ class ShortVideoPagerActivity : BaseMvpActivity<ShortVideoPagerPresenter, IShort
                     }
 
                     override fun onSlideClosed(): Boolean {
-                        finish()
-                        overridePendingTransition(0, 0)
+                        Utils.finishActivityImmediate(this@ShortVideoPagerActivity)
                         return true
                     }
 
@@ -224,6 +215,10 @@ class ShortVideoPagerActivity : BaseMvpActivity<ShortVideoPagerPresenter, IShort
             ILikesInteractor.FILTER_LIKES
         )
             .tryOpenWith(this)
+    }
+
+    override fun downloadVideo(video: Video, url: String, Res: String) {
+        DownloadWorkUtils.doDownloadVideo(this, video, url, Res)
     }
 
     override fun displayListLoading(loading: Boolean) {
@@ -309,31 +304,17 @@ class ShortVideoPagerActivity : BaseMvpActivity<ShortVideoPagerPresenter, IShort
         val statusbarNonColored = CurrentTheme.getStatusBarNonColored(this)
         val statusbarColored = CurrentTheme.getStatusBarColor(this)
         val w = window
-        w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-        w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         w.statusBarColor = if (colored) statusbarColored else statusbarNonColored
         @ColorInt val navigationColor =
             if (colored) CurrentTheme.getNavigationBarColor(this) else Color.BLACK
         w.navigationBarColor = navigationColor
-        if (Utils.hasMarshmallow()) {
-            var flags = window.decorView.systemUiVisibility
-            flags = if (invertIcons) {
-                flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-            } else {
-                flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-            }
-            window.decorView.systemUiVisibility = flags
-        }
-        if (Utils.hasOreo()) {
-            var flags = window.decorView.systemUiVisibility
-            if (invertIcons) {
-                flags = flags or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-                w.decorView.systemUiVisibility = flags
-                w.navigationBarColor = Color.WHITE
-            } else {
-                flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
-                w.decorView.systemUiVisibility = flags
-            }
+        val ins = WindowInsetsControllerCompat(w, w.decorView)
+        ins.isAppearanceLightStatusBars = invertIcons
+        ins.isAppearanceLightNavigationBars = invertIcons
+
+        if (!Utils.hasMarshmallow()) {
+            w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+            w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         }
     }
 
@@ -390,16 +371,28 @@ class ShortVideoPagerActivity : BaseMvpActivity<ShortVideoPagerPresenter, IShort
                 return ShortVideoPagerPresenter(
                     aid,
                     ownerId,
-                    this@ShortVideoPagerActivity,
                     saveInstanceState
                 )
             }
         }
 
+    private val pageChangeListener = object : ViewPager2.OnPageChangeCallback() {
+        override fun onPageSelected(position: Int) {
+            super.onPageSelected(position)
+            playDispose.dispose()
+            playDispose = Observable.just(Object())
+                .delay(400, TimeUnit.MILLISECONDS)
+                .toMainThread()
+                .subscribe { presenter?.firePageSelected(position) }
+        }
+    }
+
     override fun displayData(pageCount: Int, selectedIndex: Int) {
+        mViewPager?.unregisterOnPageChangeCallback(pageChangeListener)
         mAdapter = Adapter(pageCount)
         mViewPager?.adapter = mAdapter
         mViewPager?.setCurrentItem(selectedIndex, false)
+        mViewPager?.registerOnPageChangeCallback(pageChangeListener)
     }
 
     override fun setAspectRatioAt(position: Int, w: Int, h: Int) {

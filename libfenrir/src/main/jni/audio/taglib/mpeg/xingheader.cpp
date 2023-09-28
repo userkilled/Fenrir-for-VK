@@ -23,27 +23,21 @@
  *   http://www.mozilla.org/MPL/                                           *
  ***************************************************************************/
 
-#include <tbytevector.h>
-#include <tstring.h>
-#include <tdebug.h>
-
 #include "xingheader.h"
-#include "mpegfile.h"
+
+#include "tbytevector.h"
+#include "tstring.h"
+#include "tdebug.h"
 
 using namespace TagLib;
 
 class MPEG::XingHeader::XingHeaderPrivate
 {
 public:
-  XingHeaderPrivate() :
-    frames(0),
-    size(0),
-    type(MPEG::XingHeader::Invalid) {}
+  unsigned int frames { 0 };
+  unsigned int size { 0 };
 
-  unsigned int frames;
-  unsigned int size;
-
-  MPEG::XingHeader::HeaderType type;
+  MPEG::XingHeader::HeaderType type { MPEG::XingHeader::Invalid };
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -51,15 +45,12 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 MPEG::XingHeader::XingHeader(const ByteVector &data) :
-  d(new XingHeaderPrivate())
+  d(std::make_unique<XingHeaderPrivate>())
 {
   parse(data);
 }
 
-MPEG::XingHeader::~XingHeader()
-{
-  delete d;
-}
+MPEG::XingHeader::~XingHeader() = default;
 
 bool MPEG::XingHeader::isValid() const
 {
@@ -79,12 +70,6 @@ unsigned int MPEG::XingHeader::totalSize() const
 MPEG::XingHeader::HeaderType MPEG::XingHeader::type() const
 {
   return d->type;
-}
-
-int MPEG::XingHeader::xingHeaderOffset(TagLib::MPEG::Header::Version /*v*/,
-                                       TagLib::MPEG::Header::ChannelMode /*c*/)
-{
-  return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

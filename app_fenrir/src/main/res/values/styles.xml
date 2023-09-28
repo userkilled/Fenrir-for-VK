@@ -182,6 +182,21 @@
         <item name="colorSecondaryContainer">#E1E6C3</item>
     </style>
 
+    <style name="App.DayNight.CoffeePistachio" parent="App.DayNight">
+        <item name="colorPrimary">#9B5D56</item>
+        <item name="colorControlNormal">#46483B</item>
+        <item name="colorSecondary">#8EBD9D</item>
+        <item name="icon_color_active">#AA448AFF</item>
+        <item name="icon_color_inactive">#AAFF0000</item>
+        <item name="colorOnPrimary">#F6F6F6</item>
+        <item name="colorOnPrimaryContainer">#1E0803</item>
+        <item name="colorPrimaryContainer">#E5E3E3</item>
+        <item name="colorPrimaryInverse">#D8CECC</item>
+        <item name="colorOnSecondary">#FEFFFF</item>
+        <item name="colorOnSecondaryContainer">#0D110E</item>
+        <item name="colorSecondaryContainer">#E8ECE9</item>
+    </style>
+
     <style name="App.DayNight.ColdGold" parent="App.DayNight">
         <item name="colorPrimary">#7478BC</item>
         <item name="colorControlNormal">#7478BC</item>
@@ -545,6 +560,8 @@
 
     <style name="App.DayNight.ColdGreen.Amoled" parent="App.DayNight.ColdGreen" />
 
+    <style name="App.DayNight.CoffeePistachio.Amoled" parent="App.DayNight.CoffeePistachio" />
+
     <style name="App.DayNight.ColdGold.Amoled" parent="App.DayNight.ColdGold" />
 
     <style name="App.DayNight.BlueYellow.Amoled" parent="App.DayNight.BlueYellow" />
@@ -626,6 +643,11 @@
     </style>
 
     <style name="App.DayNight.ColdGreen.MD1" parent="App.DayNight.ColdGreen">
+        <item name="materialCardStyle">@style/CardViewMD</item>
+        <item name="materialCardBackgroundStyle">@drawable/background_rectangle_filled</item>
+    </style>
+
+    <style name="App.DayNight.CoffeePistachio.MD1" parent="App.DayNight.CoffeePistachio">
         <item name="materialCardStyle">@style/CardViewMD</item>
         <item name="materialCardBackgroundStyle">@drawable/background_rectangle_filled</item>
     </style>
@@ -754,7 +776,7 @@
         <item name="cardElevation">1dp</item>
     </style>
 
-    <style name="Theme.BadgeStyle" parent="Widget.Material3.Badge">
+    <style name="Theme.BadgeStyle" parent="Widget.Material3.Badge.AdjustToBounds">
         <item name="backgroundColor">?colorPrimary</item>
         <item name="badgeTextColor">?colorOnPrimary</item>
     </style>
@@ -984,16 +1006,16 @@
         <item name="cornerSizeTopLeft">0dp</item>
     </style>
 
-    <style name="Widget.MPM.Menu" parent="Widget.AppCompat.PopupMenu.Overflow">
-        <item name="android:popupBackground">@drawable/popupmenu_background</item>
-        <item name="mpm_paddingBottom">@dimen/mpm_popup_menu_vertical_padding</item>
+    <style name="Widget.MPM.Menu.Material3" parent="Widget.Material3.PopupMenu.Overflow">
+        <item name="android:popupBackground">@drawable/mpm_popup_menu_background</item>
+        <item name="mpm_paddingBottom">0dp</item>
         <item name="mpm_paddingStart">0dp</item>
         <item name="mpm_paddingEnd">0dp</item>
-        <item name="mpm_paddingTop">@dimen/mpm_popup_menu_vertical_padding</item>
+        <item name="mpm_paddingTop">0dp</item>
     </style>
 
     <style name="Widget.MPM.Item" parent="">
-        <item name="android:background">?attr/listChoiceBackgroundIndicator</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
     </style>
 
     <style name="MyOutlinedButton" parent="Widget.Material3.Button.OutlinedButton">

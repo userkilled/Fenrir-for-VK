@@ -9,6 +9,7 @@ import dev.ragnarok.fenrir.domain.IOwnersRepository
 import dev.ragnarok.fenrir.domain.IStoriesShortVideosInteractor
 import dev.ragnarok.fenrir.domain.mappers.Dto2Model
 import dev.ragnarok.fenrir.domain.mappers.Dto2Model.transform
+import dev.ragnarok.fenrir.domain.mappers.Dto2Model.transformNarrative
 import dev.ragnarok.fenrir.domain.mappers.Dto2Model.transformOwner
 import dev.ragnarok.fenrir.domain.mappers.MapUtil
 import dev.ragnarok.fenrir.model.IOwnersBundle
@@ -85,7 +86,7 @@ class StoriesShortVideosInteractor(
             .getNarratives(owner_id, offset, count)
             .flatMap { story ->
                 val dtos = listEmptyIfNull(story.items)
-                Single.just(MapUtil.mapAll(dtos) { transform(it) })
+                Single.just(MapUtil.mapAll(dtos) { transformNarrative(it) })
             }
     }
 
@@ -121,10 +122,10 @@ class StoriesShortVideosInteractor(
             .stories().stories_delete(owner_id, story_id)
     }
 
-    override fun getStory(accountId: Long, owner_id: Long?): Single<List<Story>> {
+    override fun getStories(accountId: Long, owner_id: Long?): Single<List<Story>> {
         return networker.vkDefault(accountId)
             .stories()
-            .getStory(owner_id, 1, Fields.FIELDS_BASE_OWNER)
+            .getStories(owner_id, 1, Fields.FIELDS_BASE_OWNER)
             .flatMap { story ->
                 val dtos_multy = listEmptyIfNull(story.items)
                 val dtos: MutableList<VKApiStory> = ArrayList()
@@ -143,7 +144,7 @@ class StoriesShortVideosInteractor(
                     owners
                 )
                     .map<List<Story>> { owners1: IOwnersBundle ->
-                        val blockAds = Settings.get().other().isAd_block_story_news
+                        val blockAds = Settings.get().main().isAd_block_story_news
                         val stories: MutableList<Story> = ArrayList()
                         for (dto in dtos) {
                             if (dto.is_ads && blockAds) {
@@ -156,14 +157,14 @@ class StoriesShortVideosInteractor(
             }
     }
 
-    override fun searchStory(
+    override fun searchStories(
         accountId: Long,
         q: String?,
         mentioned_id: Long?
     ): Single<List<Story>> {
         return networker.vkDefault(accountId)
             .stories()
-            .searchStory(q, mentioned_id, 1000, 1, Fields.FIELDS_BASE_OWNER)
+            .searchStories(q, mentioned_id, 1000, 1, Fields.FIELDS_BASE_OWNER)
             .flatMap { story ->
                 val dtos_multy = listEmptyIfNull(story.items)
                 val dtos: MutableList<VKApiStory> = ArrayList()

@@ -13,15 +13,17 @@ import android.widget.TextView
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
-import dev.ragnarok.fenrir.Constants
 import dev.ragnarok.fenrir.Extra
 import dev.ragnarok.fenrir.R
 import dev.ragnarok.fenrir.StubAnimatorListener
+import dev.ragnarok.fenrir.activity.ActivityFeatures
+import dev.ragnarok.fenrir.activity.ActivityUtils
 import dev.ragnarok.fenrir.fragment.base.BaseMvpFragment
 import dev.ragnarok.fenrir.fragment.base.core.IPresenterFactory
 import dev.ragnarok.fenrir.fromIOToMain
@@ -97,6 +99,7 @@ class FileManagerRemoteFragment :
         savedInstanceState: Bundle?
     ): View {
         val root = inflater.inflate(R.layout.fragment_file_remote_explorer, container, false)
+        (requireActivity() as AppCompatActivity).setSupportActionBar(root.findViewById(R.id.toolbar))
         mRecyclerView = root.findViewById(R.id.list)
         empty = root.findViewById(R.id.empty)
 
@@ -124,7 +127,7 @@ class FileManagerRemoteFragment :
         val columns = resources.getInteger(R.integer.files_column_count)
         mLayoutManager = StaggeredGridLayoutManager(columns, StaggeredGridLayoutManager.VERTICAL)
         mRecyclerView?.layoutManager = mLayoutManager
-        mRecyclerView?.addOnScrollListener(PicassoPauseOnScrollListener(Constants.PICASSO_TAG))
+        PicassoPauseOnScrollListener.addListener(mRecyclerView)
         tvCurrentDir = root.findViewById(R.id.current_path)
         loading = root.findViewById(R.id.loading)
 
@@ -285,7 +288,7 @@ class FileManagerRemoteFragment :
 
     override fun startPlayAudios(audios: ArrayList<Audio>, position: Int) {
         MusicPlaybackService.startForPlayList(requireActivity(), audios, position, false)
-        if (!Settings.get().other().isShow_mini_player)
+        if (!Settings.get().main().isShow_mini_player)
             PlaceFactory.getPlayerPlace(Settings.get().accounts().current)
                 .tryOpenWith(requireActivity())
     }
@@ -315,5 +318,20 @@ class FileManagerRemoteFragment :
 
     override fun notifyItemChanged(pos: Int) {
         mAdapter?.notifyItemChanged(pos)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val actionBar = ActivityUtils.supportToolbarFor(this)
+        if (actionBar != null) {
+            actionBar.setTitle(R.string.files_tab_title)
+            actionBar.subtitle = null
+        }
+        ActivityFeatures.Builder()
+            .begin()
+            .setHideNavigationMenu(false)
+            .setBarsColored(requireActivity(), true)
+            .build()
+            .apply(requireActivity())
     }
 }

@@ -64,7 +64,7 @@ class OtherVKRestProvider @SuppressLint("CheckResult") constructor(private val p
             ProxyUtil.applyProxyConfig(builder, proxySettings.activeProxy)
             HttpLoggerAndParser.adjust(builder)
             HttpLoggerAndParser.configureToIgnoreCertificates(builder)
-            SimplePostHttp("https://" + Settings.get().other().get_Auth_Domain(), builder)
+            SimplePostHttp("https://" + Settings.get().main().authDomain, builder)
         }
     }
 
@@ -88,14 +88,14 @@ class OtherVKRestProvider @SuppressLint("CheckResult") constructor(private val p
             HttpLoggerAndParser.adjust(builder)
             HttpLoggerAndParser.configureToIgnoreCertificates(builder)
             SimplePostHttp(
-                "https://" + Settings.get().other().get_Api_Domain() + "/method",
+                "https://" + Settings.get().main().apiDomain + "/method",
                 builder
             )
         }
     }
 
     private fun createLocalServerRest(): SimplePostHttp {
-        val localSettings = Settings.get().other().localServer
+        val localSettings = Settings.get().main().localServer
         val builder: OkHttpClient.Builder = OkHttpClient.Builder()
             .readTimeout(Constants.API_TIMEOUT, TimeUnit.SECONDS)
             .connectTimeout(Constants.API_TIMEOUT, TimeUnit.SECONDS)
@@ -148,7 +148,7 @@ class OtherVKRestProvider @SuppressLint("CheckResult") constructor(private val p
         HttpLoggerAndParser.adjust(builder)
         HttpLoggerAndParser.configureToIgnoreCertificates(builder)
         return SimplePostHttp(
-            "https://" + Settings.get().other().get_Api_Domain() + "/method",
+            "https://" + Settings.get().main().apiDomain + "/method",
             builder
         )
     }
@@ -180,7 +180,7 @@ class OtherVKRestProvider @SuppressLint("CheckResult") constructor(private val p
     }
 
     init {
-        proxySettings.observeActive()
+        proxySettings.observeActive
             .subscribe { onProxySettingsChanged() }
     }
 }

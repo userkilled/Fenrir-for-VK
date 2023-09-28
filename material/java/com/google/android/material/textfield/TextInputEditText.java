@@ -46,9 +46,14 @@ import com.google.android.material.internal.ThemeEnforcement;
  * accessibility support for {@link com.google.android.material.textfield.TextInputLayout}.
  *
  * <p><strong>Note:</strong> If you programmatically construct a {@link TextInputEditText} as a
- * child of a {@link TextInputLayout}, you should use {@link TextInputLayout}'s `context` to
- * create the view. This will allow {@link TextInputLayout} to pass along the appropriate styling
- * to the {@link TextInputEditText}.
+ * child of a {@link TextInputLayout}, you should use {@link TextInputLayout}'s `context` to create
+ * the view. This will allow {@link TextInputLayout} to pass along the appropriate styling to the
+ * {@link TextInputEditText}.
+ *
+ * <p>For more information, see the <a
+ * href="https://github.com/material-components/material-components-android/blob/master/docs/components/TextField.md">component
+ * developer guidance</a> and <a href="https://material.io/components/text-fields/overview">design
+ * guidelines</a>.
  */
 public class TextInputEditText extends AppCompatEditText {
 
@@ -169,9 +174,17 @@ public class TextInputEditText extends AppCompatEditText {
   @Override
   public boolean getGlobalVisibleRect(@Nullable Rect r, @Nullable Point globalOffset) {
     TextInputLayout textInputLayout = getTextInputLayout();
-    return shouldUseTextInputLayoutFocusedRect(textInputLayout)
-        ? textInputLayout.getGlobalVisibleRect(r, globalOffset)
-        : super.getGlobalVisibleRect(r, globalOffset);
+    if (shouldUseTextInputLayoutFocusedRect(textInputLayout)) {
+      boolean isVisible = textInputLayout.getGlobalVisibleRect(r, globalOffset);
+      if (isVisible && globalOffset != null) {
+        // View#getGlobalVisibleRect returns a globalOffset offset by the negative amount of the
+        // scroll in the given view. Here we need to offset the negative amount of the scroll in
+        // TextInputEditText when calling getGlobalVisibleRect on the parent TextInputLayout.
+        globalOffset.offset(-getScrollX(), -getScrollY());
+      }
+      return isVisible;
+    }
+    return super.getGlobalVisibleRect(r, globalOffset);
   }
 
   @Override

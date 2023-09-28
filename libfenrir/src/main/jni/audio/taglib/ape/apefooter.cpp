@@ -24,13 +24,9 @@
  *   http://www.mozilla.org/MPL/                                           *
  ***************************************************************************/
 
-#include <iostream>
-#include <bitset>
-
-#include <tstring.h>
-#include <tdebug.h>
-
 #include "apefooter.h"
+
+#include <bitset>
 
 using namespace TagLib;
 using namespace APE;
@@ -38,23 +34,15 @@ using namespace APE;
 class APE::Footer::FooterPrivate
 {
 public:
-  FooterPrivate() :
-    version(0),
-    footerPresent(true),
-    headerPresent(false),
-    isHeader(false),
-    itemCount(0),
-    tagSize(0) {}
+  unsigned int version { 0 };
 
-  unsigned int version;
+  bool footerPresent { true };
+  bool headerPresent { false };
 
-  bool footerPresent;
-  bool headerPresent;
+  bool isHeader { false };
 
-  bool isHeader;
-
-  unsigned int itemCount;
-  unsigned int tagSize;
+  unsigned int itemCount { 0 };
+  unsigned int tagSize { 0 };
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -76,20 +64,17 @@ ByteVector APE::Footer::fileIdentifier()
 ////////////////////////////////////////////////////////////////////////////////
 
 APE::Footer::Footer() :
-  d(new FooterPrivate())
+  d(std::make_unique<FooterPrivate>())
 {
 }
 
 APE::Footer::Footer(const ByteVector &data) :
-  d(new FooterPrivate())
+  d(std::make_unique<FooterPrivate>())
 {
   parse(data);
 }
 
-APE::Footer::~Footer()
-{
-  delete d;
-}
+APE::Footer::~Footer() = default;
 
 unsigned int APE::Footer::version() const
 {

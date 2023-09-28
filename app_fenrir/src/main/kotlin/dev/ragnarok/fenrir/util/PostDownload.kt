@@ -10,12 +10,16 @@ import android.webkit.MimeTypeMap
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
-import dev.ragnarok.fenrir.*
+import dev.ragnarok.fenrir.Constants
+import dev.ragnarok.fenrir.R
+import dev.ragnarok.fenrir.fromIOToMain
 import dev.ragnarok.fenrir.longpoll.AppNotificationChannels
 import dev.ragnarok.fenrir.longpoll.NotificationHelper
 import dev.ragnarok.fenrir.model.Owner
 import dev.ragnarok.fenrir.model.PhotoSize
 import dev.ragnarok.fenrir.model.Post
+import dev.ragnarok.fenrir.nonNullNoEmpty
+import dev.ragnarok.fenrir.orZero
 import dev.ragnarok.fenrir.push.OwnerInfo
 import dev.ragnarok.fenrir.service.ChatDownloadWorker
 import dev.ragnarok.fenrir.settings.Settings
@@ -417,9 +421,9 @@ class PostDownload(private val context: Context) {
                 var result_msgs = "<ul><#MESSAGE_LIST#></ul>"
                 result_msgs = Apply("<#MESSAGE_LIST#>", msgs.toString(), result_msgs)
                 main = Apply("<#MESSAGES#>", result_msgs, main)
-                DownloadWorkUtils.CheckDirectory(Settings.get().other().docDir)
+                DownloadWorkUtils.CheckDirectory(Settings.get().main().docDir)
                 val html = File(
-                    Settings.get().other().docDir, DownloadWorkUtils.makeLegalFilename(
+                    Settings.get().main().docDir, DownloadWorkUtils.makeLegalFilename(
                         peer_title, "html"
                     )
                 )

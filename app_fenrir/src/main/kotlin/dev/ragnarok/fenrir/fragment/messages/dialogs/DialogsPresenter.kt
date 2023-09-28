@@ -9,6 +9,7 @@ import dev.ragnarok.fenrir.crypt.KeyLocationPolicy
 import dev.ragnarok.fenrir.domain.IAccountsInteractor
 import dev.ragnarok.fenrir.domain.IMessagesRepository
 import dev.ragnarok.fenrir.domain.IOwnersRepository
+import dev.ragnarok.fenrir.domain.IStickersInteractor
 import dev.ragnarok.fenrir.domain.InteractorFactory
 import dev.ragnarok.fenrir.domain.Repository.messages
 import dev.ragnarok.fenrir.domain.Repository.owners
@@ -23,6 +24,7 @@ import dev.ragnarok.fenrir.nonNullNoEmpty
 import dev.ragnarok.fenrir.settings.ISettings
 import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.util.AssertUtils.assertPositive
+import dev.ragnarok.fenrir.util.HelperSimple
 import dev.ragnarok.fenrir.util.Optional
 import dev.ragnarok.fenrir.util.Optional.Companion.empty
 import dev.ragnarok.fenrir.util.Optional.Companion.wrap
@@ -37,7 +39,6 @@ import dev.ragnarok.fenrir.util.Utils.isHiddenAccount
 import dev.ragnarok.fenrir.util.Utils.isHiddenCurrent
 import dev.ragnarok.fenrir.util.Utils.join
 import dev.ragnarok.fenrir.util.Utils.needReloadDialogs
-import dev.ragnarok.fenrir.util.Utils.needReloadStickers
 import dev.ragnarok.fenrir.util.rxutils.RxUtils.dummy
 import dev.ragnarok.fenrir.util.rxutils.RxUtils.ignore
 import io.reactivex.rxjava3.disposables.CompositeDisposable
@@ -50,6 +51,7 @@ class DialogsPresenter(
 ) : AccountDependencyPresenter<IDialogsView>(accountId, savedInstanceState, true) {
     private val dialogs: ArrayList<Dialog>
     private val messagesInteractor: IMessagesRepository
+    private val stickerInteractor: IStickersInteractor
     private val accountsInteractor: IAccountsInteractor
     private val longpollManager: ILongpollManager
     private val netDisposable = CompositeDisposable()
@@ -59,7 +61,8 @@ class DialogsPresenter(
     private var endOfContent = false
     private var netLoadingNow = false
     private var cacheNowLoading = false
-    private var needAskWhenGuiReady = false
+    private var needAskReloadDialogsWhenGuiReady = false
+    private var needShowDialogSendHelperWhenGuiReady = false
     override fun saveState(outState: Bundle) {
         super.saveState(outState)
         outState.putLong(SAVE_DIALOGS_OWNER_ID, dialogsOwnerId)
@@ -71,14 +74,19 @@ class DialogsPresenter(
 
         // only for user dialogs
         viewHost.setCreateGroupChatButtonVisible(dialogsOwnerId > 0)
-        if (needAskWhenGuiReady) {
+        if (needAskReloadDialogsWhenGuiReady) {
             viewHost.askToReload()
-            needAskWhenGuiReady = false
+            needAskReloadDialogsWhenGuiReady = false
+        }
+
+        if (needShowDialogSendHelperWhenGuiReady) {
+            viewHost.showDialogSendHelper()
+            needShowDialogSendHelperWhenGuiReady = false
         }
     }
 
     private fun onDialogsFirstResponse(data: List<Dialog>) {
-        if (!Settings.get().other().isBe_online || isHiddenAccount(accountId)) {
+        if (!Settings.get().main().isBe_online || isHiddenAccount(accountId)) {
             netDisposable.add(
                 accountsInteractor.setOffline(accountId)
                     .fromIOToMain()
@@ -90,8 +98,8 @@ class DialogsPresenter(
         dialogs.clear()
         dialogs.addAll(data)
         safeNotifyDataSetChanged()
-        if (!isHiddenCurrent && needReloadStickers(accountId)) {
-            receiveStickers()
+        if (!isHiddenCurrent) {
+            receiveSubItems()
         }
     }
 
@@ -140,7 +148,7 @@ class DialogsPresenter(
     }
 
     private fun onNextDialogsResponse(data: List<Dialog>) {
-        if (!Settings.get().other().isBe_online || isHiddenAccount(accountId)) {
+        if (!Settings.get().main().isBe_online || isHiddenAccount(accountId)) {
             netDisposable.add(
                 accountsInteractor.setOffline(accountId)
                     .fromIOToMain()
@@ -226,21 +234,69 @@ class DialogsPresenter(
     }
 
     @SuppressLint("CheckResult")
-    private fun receiveStickers() {
+    private fun receiveSubItems() {
         if (accountId <= 0) {
             return
         }
         try {
-            InteractorFactory.createStickersInteractor()
-                .getAndStoreStickerSets(accountId)
-                .fromIOToMain()
-                .subscribe(dummy()) {
-                    if (Settings.get().other().isDeveloper_mode) {
-                        showError(it)
+            if (Utils.needReloadReactionAssets(accountId)) {
+                messagesInteractor
+                    .getReactionsAssets(accountId)
+                    .fromIOToMain()
+                    .subscribe({
+                        if (Utils.getReactionsAssets()[accountId] == null) {
+                            Utils.getReactionsAssets()[accountId] = HashMap()
+                        } else {
+                            Utils.getReactionsAssets()[accountId]?.clear()
+                        }
+                        for (i in it) {
+                            Utils.getReactionsAssets()[accountId]?.set(i.reaction_id, i)
+                        }
+                    }) {
+                        Settings.get().main().del_last_reaction_assets_sync(accountId)
+                        if (Settings.get().main().isDeveloper_mode) {
+                            showError(it)
+                        }
                     }
-                }
+            }
+
+            if (Utils.needReloadStickerSets(accountId)) {
+                stickerInteractor
+                    .reciveAndStoreStickerSets(accountId)
+                    .fromIOToMain()
+                    .subscribe(dummy()) {
+                        Settings.get().main().del_last_sticker_sets_sync(accountId)
+                        if (Settings.get().main().isDeveloper_mode) {
+                            showError(it)
+                        }
+                    }
+            }
+            if (Utils.needReloadStickerSetsCustom(accountId)) {
+                stickerInteractor
+                    .reciveAndStoreCustomStickerSets(accountId)
+                    .fromIOToMain()
+                    .subscribe(dummy()) {
+                        Settings.get().main().del_last_sticker_sets_custom_sync(accountId)
+                        if (Settings.get().main().isDeveloper_mode) {
+                            showError(it)
+                        }
+                    }
+            }
+            if (Settings.get()
+                    .main().isHint_stickers && Utils.needReloadStickerKeywords(accountId)
+            ) {
+                stickerInteractor
+                    .reciveAndStoreKeywordsStickers(accountId)
+                    .fromIOToMain()
+                    .subscribe(dummy()) {
+                        Settings.get().main().del_last_sticker_keywords_sync(accountId)
+                        if (Settings.get().main().isDeveloper_mode) {
+                            showError(it)
+                        }
+                    }
+            }
         } catch (e: Exception) {
-            if (Settings.get().other().isDeveloper_mode) {
+            if (Settings.get().main().isDeveloper_mode) {
                 showError(e)
             }
         }
@@ -253,13 +309,22 @@ class DialogsPresenter(
         safeNotifyDataSetChanged()
         resolveRefreshingView()
         view?.notifyHasAttachments(models != null)
-        if (Settings.get().other().isNot_update_dialogs || isHiddenCurrent) {
-            if (!isHiddenCurrent && needReloadStickers(accountId)) {
-                receiveStickers()
+
+        if (models != null && HelperSimple.needHelp(HelperSimple.DIALOG_SEND_HELPER, 3)) {
+            if (view == null) {
+                needShowDialogSendHelperWhenGuiReady = true
+            } else {
+                view?.showDialogSendHelper()
+            }
+        }
+
+        if (Settings.get().main().isNot_update_dialogs || isHiddenCurrent) {
+            if (!isHiddenCurrent) {
+                receiveSubItems()
             }
             if (needReloadDialogs(accountId)) {
                 if (view == null) {
-                    needAskWhenGuiReady = true
+                    needAskReloadDialogsWhenGuiReady = true
                 } else {
                     view?.askToReload()
                 }
@@ -637,7 +702,7 @@ class DialogsPresenter(
         val isHide = Settings.get().security().isHiddenDialog(dialog.getOwnerObjectId())
         contextView.setCanDelete(true)
         contextView.setCanRead(!isHiddenCurrent && !dialog.isLastMessageOut && dialog.lastMessageId != dialog.inRead)
-        contextView.setCanAddToHomescreen(dialogsOwnerId > 0 && !isHide)
+        contextView.setCanAddToHomeScreen(dialogsOwnerId > 0 && !isHide)
         contextView.setCanAddToShortcuts(dialogsOwnerId > 0 && !isHide)
         contextView.setCanConfigNotifications(dialogsOwnerId > 0)
         contextView.setPinned(dialog.major_id > 0)
@@ -677,6 +742,7 @@ class DialogsPresenter(
         dialogsOwnerId = savedInstanceState?.getLong(SAVE_DIALOGS_OWNER_ID)
             ?: initialDialogsOwnerId
         messagesInteractor = messages
+        stickerInteractor = InteractorFactory.createStickersInteractor()
         accountsInteractor = InteractorFactory.createAccountInteractor()
         longpollManager = LongpollInstance.longpollManager
         appendDisposable(

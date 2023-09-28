@@ -7,6 +7,7 @@ import dev.ragnarok.fenrir.getBoolean
 import dev.ragnarok.fenrir.model.catalog_v2_audio.CatalogV2ArtistItem
 import dev.ragnarok.fenrir.model.catalog_v2_audio.CatalogV2Block
 import dev.ragnarok.fenrir.model.catalog_v2_audio.CatalogV2Link
+import dev.ragnarok.fenrir.model.catalog_v2_audio.CatalogV2RecommendationPlaylist
 import dev.ragnarok.fenrir.putBoolean
 import dev.ragnarok.fenrir.readTypedObjectCompat
 import dev.ragnarok.fenrir.upload.Upload
@@ -25,7 +26,7 @@ class ParcelableModelWrapper : Parcelable {
                     return arrayOfNulls(size)
                 }
             }
-        private val TYPES: ArrayMap<Int, (parcel: Parcel) -> AbsModel?> = ArrayMap(43)
+        private val TYPES: ArrayMap<Int, (parcel: Parcel) -> AbsModel?> = ArrayMap(47)
 
         fun wrap(model: AbsModel): ParcelableModelWrapper {
             return ParcelableModelWrapper(model)
@@ -110,10 +111,15 @@ class ParcelableModelWrapper : Parcelable {
             TYPES[AbsModelType.MODEL_POLL] = { it.readTypedObjectCompat(Poll.CREATOR) }
             TYPES[AbsModelType.MODEL_POLL_ANSWER] =
                 { it.readTypedObjectCompat(Poll.Answer.CREATOR) }
+            TYPES[AbsModelType.MODEL_POLL_BACKGROUND] =
+                { it.readTypedObjectCompat(Poll.PollBackground.CREATOR) }
+            TYPES[AbsModelType.MODEL_POLL_BACKGROUND_POINT] =
+                { it.readTypedObjectCompat(Poll.PollBackgroundPoint.CREATOR) }
             TYPES[AbsModelType.MODEL_POST] = { it.readTypedObjectCompat(Post.CREATOR) }
             TYPES[AbsModelType.MODEL_SHORT_LINK] = { it.readTypedObjectCompat(ShortLink.CREATOR) }
             TYPES[AbsModelType.MODEL_STICKER] = { it.readTypedObjectCompat(Sticker.CREATOR) }
             TYPES[AbsModelType.MODEL_STORY] = { it.readTypedObjectCompat(Story.CREATOR) }
+            TYPES[AbsModelType.MODEL_NARRATIVE] = { it.readTypedObjectCompat(Narratives.CREATOR) }
             TYPES[AbsModelType.MODEL_TOPIC] = { it.readTypedObjectCompat(Topic.CREATOR) }
             TYPES[AbsModelType.MODEL_USER] = { it.readTypedObjectCompat(User.CREATOR) }
             TYPES[AbsModelType.MODEL_VIDEO] = { it.readTypedObjectCompat(Video.CREATOR) }
@@ -130,6 +136,8 @@ class ParcelableModelWrapper : Parcelable {
                 { it.readTypedObjectCompat(CatalogV2Block.CREATOR) }
             TYPES[AbsModelType.MODEL_CATALOG_V2_LINK] =
                 { it.readTypedObjectCompat(CatalogV2Link.CREATOR) }
+            TYPES[AbsModelType.MODEL_CATALOG_V2_RECOMMENDATION_PLAYLIST] =
+                { it.readTypedObjectCompat(CatalogV2RecommendationPlaylist.CREATOR) }
         }
     }
 

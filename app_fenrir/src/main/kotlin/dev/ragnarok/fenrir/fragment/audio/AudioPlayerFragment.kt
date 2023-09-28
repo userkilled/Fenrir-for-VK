@@ -38,7 +38,7 @@ import dev.ragnarok.fenrir.domain.IAudioInteractor
 import dev.ragnarok.fenrir.domain.InteractorFactory
 import dev.ragnarok.fenrir.fragment.search.SearchContentType
 import dev.ragnarok.fenrir.fragment.search.criteria.AudioSearchCriteria
-import dev.ragnarok.fenrir.materialpopupmenu.MaterialPopupMenuBuilder
+import dev.ragnarok.fenrir.materialpopupmenu.popupMenu
 import dev.ragnarok.fenrir.media.music.MusicPlaybackController
 import dev.ragnarok.fenrir.media.music.PlayerStatus
 import dev.ragnarok.fenrir.model.Audio
@@ -67,7 +67,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
-import java.lang.ref.WeakReference
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
@@ -105,7 +104,7 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
     private var ivBackground: View? = null
 
     // Handler used to update the current time
-    private var mTimeHandler: TimeHandler? = null
+    private var mRefreshDisposable = Disposable.disposed()
     private var mStartSeekPos: Long = 0
     private var mLastSeekEventTime: Long = 0
     private var coverAdapter: CoverAdapter? = null
@@ -286,74 +285,69 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
         mRepeatButton = root.findViewById(R.id.action_button_repeat)
         val mAdditional = root.findViewById<ImageView>(R.id.goto_button)
         mAdditional.setOnClickListener {
-            val popupMenu = MaterialPopupMenuBuilder()
-            popupMenu.section {
-                if (isEqualizerAvailable) {
-                    item {
-                        labelRes = R.string.equalizer
-                        icon = R.drawable.preferences
+            it.popupMenu(requireActivity()) {
+                section {
+                    if (isEqualizerAvailable) {
+                        item(R.string.equalizer) {
+                            icon = R.drawable.preferences
+                            iconColor = CurrentTheme.getColorSecondary(requireActivity())
+                            onSelect {
+                                startEffectsPanel()
+                            }
+                        }
+                    }
+                    item(R.string.playlist) {
+                        icon = R.drawable.ic_menu_24_white
                         iconColor = CurrentTheme.getColorSecondary(requireActivity())
-                        callback = {
-                            startEffectsPanel()
+                        onSelect {
+                            val tmpList = MusicPlaybackController.queue
+                            if (tmpList.nonNullNoEmpty()) {
+                                PlaylistFragment.newInstance(ArrayList(tmpList))
+                                    .show(childFragmentManager, "audio_playlist")
+                            }
                         }
                     }
-                }
-                item {
-                    labelRes = R.string.playlist
-                    icon = R.drawable.ic_menu_24_white
-                    iconColor = CurrentTheme.getColorSecondary(requireActivity())
-                    callback = {
-                        val tmpList = MusicPlaybackController.queue
-                        if (tmpList.nonNullNoEmpty()) {
-                            PlaylistFragment.newInstance(ArrayList(tmpList))
-                                .show(childFragmentManager, "audio_playlist")
+                    item(R.string.copy_track_info) {
+                        icon = R.drawable.content_copy
+                        iconColor = CurrentTheme.getColorSecondary(requireActivity())
+                        onSelect {
+                            val clipboard =
+                                requireActivity().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager?
+                            var Artist =
+                                if (MusicPlaybackController.artistName != null) MusicPlaybackController.artistName else ""
+                            if (MusicPlaybackController.albumName != null) Artist += " (" + MusicPlaybackController.albumName + ")"
+                            val Name =
+                                if (MusicPlaybackController.trackName != null) MusicPlaybackController.trackName else ""
+                            val clip = ClipData.newPlainText("response", "$Artist - $Name")
+                            clipboard?.setPrimaryClip(clip)
+                            createCustomToast(requireActivity()).showToast(R.string.copied_to_clipboard)
                         }
                     }
-                }
-                item {
-                    labelRes = R.string.copy_track_info
-                    icon = R.drawable.content_copy
-                    iconColor = CurrentTheme.getColorSecondary(requireActivity())
-                    callback = {
-                        val clipboard =
-                            requireActivity().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager?
-                        var Artist =
-                            if (MusicPlaybackController.artistName != null) MusicPlaybackController.artistName else ""
-                        if (MusicPlaybackController.albumName != null) Artist += " (" + MusicPlaybackController.albumName + ")"
-                        val Name =
-                            if (MusicPlaybackController.trackName != null) MusicPlaybackController.trackName else ""
-                        val clip = ClipData.newPlainText("response", "$Artist - $Name")
-                        clipboard?.setPrimaryClip(clip)
-                        createCustomToast(requireActivity()).showToast(R.string.copied_to_clipboard)
+                    item(R.string.show_qr) {
+                        icon = R.drawable.qr_code
+                        iconColor = CurrentTheme.getColorSecondary(requireActivity())
+                        onSelect {
+                            fireAudioQR()
+                        }
                     }
-                }
-                item {
-                    labelRes = R.string.show_qr
-                    icon = R.drawable.qr_code
-                    iconColor = CurrentTheme.getColorSecondary(requireActivity())
-                    callback = {
-                        fireAudioQR()
-                    }
-                }
-                item {
-                    labelRes = R.string.search_by_artist
-                    icon = R.drawable.magnify
-                    iconColor = CurrentTheme.getColorSecondary(requireActivity())
-                    callback = {
-                        PlaceFactory.getSingleTabSearchPlace(
-                            mAccountId,
-                            SearchContentType.AUDIOS,
-                            AudioSearchCriteria(
-                                MusicPlaybackController.artistName,
-                                by_artist = true,
-                                in_main_page = false
-                            )
-                        ).tryOpenWith(requireActivity())
-                        dismissAllowingStateLoss()
+                    item(R.string.search_by_artist) {
+                        icon = R.drawable.magnify
+                        iconColor = CurrentTheme.getColorSecondary(requireActivity())
+                        onSelect {
+                            PlaceFactory.getSingleTabSearchPlace(
+                                mAccountId,
+                                SearchContentType.AUDIOS,
+                                AudioSearchCriteria(
+                                    MusicPlaybackController.artistName,
+                                    by_artist = true,
+                                    in_main_page = false
+                                )
+                            ).tryOpenWith(requireActivity())
+                            dismissAllowingStateLoss()
+                        }
                     }
                 }
             }
-            popupMenu.build().show(requireActivity(), it)
         }
         val mPreviousButton: RepeatingImageButton = root.findViewById(R.id.action_button_previous)
         val mNextButton: RepeatingImageButton = root.findViewById(R.id.action_button_next)
@@ -441,7 +435,6 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
 
         resolveAddButton()
 
-        mTimeHandler = TimeHandler(this)
         appendDisposable(MusicPlaybackController.observeServiceBinding()
             .toMainThread()
             .subscribe { onServiceBindEvent(it) })
@@ -662,18 +655,6 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
         // Refresh the current time
         val next = refreshCurrentTime()
         queueNextRefresh(next)
-        MusicPlaybackController.notifyForegroundStateChanged(
-            requireActivity(),
-            MusicPlaybackController.isPlaying
-        )
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    override fun onStop() {
-        super.onStop()
-        MusicPlaybackController.notifyForegroundStateChanged(requireActivity(), false)
     }
 
     /**
@@ -682,8 +663,7 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
     override fun onDestroy() {
         playDispose.dispose()
         mCompositeDisposable.dispose()
-        mTimeHandler?.removeMessages(REFRESH_TIME)
-        mTimeHandler = null
+        mRefreshDisposable.dispose()
         mBroadcastDisposable.dispose()
         PicassoInstance.with().cancelTag(PLAYER_TAG)
         super.onDestroy()
@@ -737,7 +717,7 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
         tvTitle?.text = audioTrack?.artist
         tvSubtitle?.text = audioTrack?.title
 
-        if (Settings.get().other().isPlayer_Has_Background) {
+        if (Settings.get().main().isPlayer_Has_Background) {
             val coverUrl =
                 firstNonEmptyString(
                     audioTrack?.thumb_image_big,
@@ -749,7 +729,7 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
                     .tag(PLAYER_TAG)
                     .transform(
                         BlurTransformation(
-                            Settings.get().other().playerCoverBackgroundSettings.blur.toFloat(),
+                            Settings.get().main().playerCoverBackgroundSettings.blur.toFloat(),
                             requireActivity()
                         )
                     )
@@ -885,12 +865,14 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
     /**
      * @param delay When to update
      */
-    internal fun queueNextRefresh(delay: Long) {
-        val message = mTimeHandler?.obtainMessage(REFRESH_TIME)
-        mTimeHandler?.removeMessages(REFRESH_TIME)
-        if (message != null) {
-            mTimeHandler?.sendMessageDelayed(message, delay)
-        }
+    private fun queueNextRefresh(delay: Long) {
+        mRefreshDisposable.dispose()
+        mRefreshDisposable = Observable.just(Any())
+            .delay(delay, TimeUnit.MILLISECONDS)
+            .toMainThread()
+            .subscribe {
+                queueNextRefresh(refreshCurrentTime())
+            }
     }
 
     private fun resolveControlViews() {
@@ -981,7 +963,7 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
         mCurrentTime?.text = MusicPlaybackController.makeTimeString(requireActivity(), pos / 1000)
     }
 
-    internal fun refreshCurrentTime(): Long {
+    private fun refreshCurrentTime(): Long {
         if (!MusicPlaybackController.isInitialized) {
             mCurrentTime?.text = "--:--"
             mTotalTime?.text = "--:--"
@@ -1042,19 +1024,6 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
         return 500
     }
 
-    /**
-     * Used to update the current time string
-     */
-    private class TimeHandler(player: AudioPlayerFragment) : Handler(Looper.getMainLooper()) {
-        private val mAudioPlayer: WeakReference<AudioPlayerFragment> = WeakReference(player)
-        override fun handleMessage(msg: Message) {
-            if (msg.what == REFRESH_TIME) {
-                mAudioPlayer.get()?.let { it.queueNextRefresh(it.refreshCurrentTime()) }
-            }
-        }
-
-    }
-
     private inner class CoverViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val ivCover: RLottieShapeableImageView = view.findViewById(R.id.cover)
 
@@ -1074,7 +1043,7 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
                     ivCover.scaleType = ImageView.ScaleType.CENTER
                     if (FenrirNative.isNativeLoaded) {
                         ivCover.fromRes(
-                            Common.getPlayerNullArtAnimation(Settings.get().other().paganSymbol),
+                            Common.getPlayerNullArtAnimation(Settings.get().main().paganSymbol),
                             450,
                             450,
                             intArrayOf(
@@ -1113,7 +1082,7 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
                 ivCover.scaleType = ImageView.ScaleType.CENTER
                 if (FenrirNative.isNativeLoaded) {
                     ivCover.fromRes(
-                        Common.getPlayerNullArtAnimation(Settings.get().other().paganSymbol),
+                        Common.getPlayerNullArtAnimation(Settings.get().main().paganSymbol),
                         450,
                         450,
                         intArrayOf(
@@ -1178,10 +1147,6 @@ class AudioPlayerFragment : BottomSheetDialogFragment(), CustomSeekBar.CustomSee
     }
 
     companion object {
-        // Message to refresh the time
-        private const val REFRESH_TIME = 1
-
-
         fun buildArgs(accountId: Long): Bundle {
             val bundle = Bundle()
             bundle.putLong(Extra.ACCOUNT_ID, accountId)

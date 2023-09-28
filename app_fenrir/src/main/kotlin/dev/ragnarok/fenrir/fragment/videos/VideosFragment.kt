@@ -23,7 +23,6 @@ import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import dev.ragnarok.fenrir.Constants
 import dev.ragnarok.fenrir.Extra
 import dev.ragnarok.fenrir.R
 import dev.ragnarok.fenrir.activity.ActivityFeatures
@@ -239,7 +238,7 @@ class VideosFragment : BaseMvpFragment<VideosListPresenter, IVideosListView>(), 
         val columns = requireActivity().resources.getInteger(R.integer.videos_column_count)
         val manager = StaggeredGridLayoutManager(columns, StaggeredGridLayoutManager.VERTICAL)
         recyclerView.layoutManager = manager
-        recyclerView.addOnScrollListener(PicassoPauseOnScrollListener(Constants.PICASSO_TAG))
+        PicassoPauseOnScrollListener.addListener(recyclerView)
         recyclerView.addOnScrollListener(object : EndlessRecyclerOnScrollListener() {
             override fun onScrollToLastElement() {
                 presenter?.fireScrollToEnd()
@@ -409,10 +408,10 @@ class VideosFragment : BaseMvpFragment<VideosListPresenter, IVideosListView>(), 
         menus.header(video.title, R.drawable.video, video.image)
         menus.columns(2)
         menus.show(
-            requireActivity().supportFragmentManager,
+            childFragmentManager,
             "video_options"
-        ) {
-            when (it.id) {
+        ) { _, option ->
+            when (option.id) {
                 R.id.action_copy_url -> {
                     val clipboard =
                         requireActivity().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager?
@@ -436,7 +435,7 @@ class VideosFragment : BaseMvpFragment<VideosListPresenter, IVideosListView>(), 
 
                 else -> {
                     presenter?.fireVideoOption(
-                        it.id,
+                        option.id,
                         video,
                         position,
                         requireActivity()

@@ -6,6 +6,8 @@
 #include <cinttypes>
 #include <cstdlib>
 
+#include <android/bitmap.h>
+
 #include "libyuv/convert_argb.h"
 #include "libyuv/rotate_argb.h"
 #include "libyuv/convert.h"
@@ -19,11 +21,11 @@
   free(var##_mem);                  \
   var = 0
 
-static void weave_pixels(const uint8_t *src_u,
-                         const uint8_t *src_v,
-                         int src_pixel_stride_uv,
-                         uint8_t *dst_uv,
-                         int width) {
+void weave_pixels_image_proccessing(const uint8_t *src_u,
+                                    const uint8_t *src_v,
+                                    int src_pixel_stride_uv,
+                                    uint8_t *dst_uv,
+                                    int width) {
     int i;
     for (i = 0; i < width; ++i) {
         dst_uv[0] = *src_u;
@@ -34,7 +36,7 @@ static void weave_pixels(const uint8_t *src_u,
     }
 }
 
-static libyuv::RotationMode get_rotation_mode(int rotation) {
+libyuv::RotationMode get_rotation_mode_image_proccessing(int rotation) {
     libyuv::RotationMode mode = libyuv::kRotate0;
     switch (rotation) {
         case 0:
@@ -56,18 +58,18 @@ static libyuv::RotationMode get_rotation_mode(int rotation) {
 }
 
 // Helper function to convert Android420 to ABGR with options to choose full swing or studio swing.
-static int Android420ToABGR(const uint8_t *src_y,
-                            int src_stride_y,
-                            const uint8_t *src_u,
-                            int src_stride_u,
-                            const uint8_t *src_v,
-                            int src_stride_v,
-                            int src_pixel_stride_uv,
-                            uint8_t *dst_abgr,
-                            int dst_stride_abgr,
-                            bool is_full_swing,
-                            int width,
-                            int height) {
+int Android420ToABGR_image_proccessing(const uint8_t *src_y,
+                                       int src_stride_y,
+                                       const uint8_t *src_u,
+                                       int src_stride_u,
+                                       const uint8_t *src_v,
+                                       int src_stride_v,
+                                       int src_pixel_stride_uv,
+                                       uint8_t *dst_abgr,
+                                       int dst_stride_abgr,
+                                       bool is_full_swing,
+                                       int width,
+                                       int height) {
     return Android420ToARGBMatrix(src_y,
                                   src_stride_y,
                                   src_v,
@@ -85,6 +87,59 @@ static int Android420ToABGR(const uint8_t *src_y,
 
 
 extern "C" {
+JNIEXPORT jint
+Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeCopyBetweenByteBufferAndBitmap(
+        JNIEnv *env,
+        jobject,
+        jobject bitmap,
+        jobject converted_buffer,
+        int src_stride_argb,
+        int dst_stride_argb,
+        int width,
+        int height,
+        jboolean isCopyBufferToBitmap
+) {
+    void *bitmapAddress = nullptr;
+    int copyResult;
+
+
+    // get bitmap address
+    int lockResult = AndroidBitmap_lockPixels(env, bitmap, &bitmapAddress);
+    if (lockResult != 0) {
+        return -1;
+    }
+
+    // get buffer address
+    auto *bufferAddress = static_cast<uint8_t *>(
+            env->GetDirectBufferAddress(converted_buffer));
+
+    // copy from buffer to bitmap
+    if (isCopyBufferToBitmap) {
+        copyResult = libyuv::ARGBCopy(bufferAddress, src_stride_argb,
+                                      reinterpret_cast<uint8_t *> (bitmapAddress), dst_stride_argb,
+                                      width, height);
+    }
+
+        // copy from bitmap to buffer
+    else {
+        copyResult = libyuv::ARGBCopy(reinterpret_cast<uint8_t *> (bitmapAddress), src_stride_argb,
+                                      bufferAddress, dst_stride_argb, width, height);
+    }
+
+    // check value of copy
+    if (copyResult != 0) {
+        return -1;
+    }
+
+    // balance call to AndroidBitmap_lockPixels
+    int unlockResult = AndroidBitmap_unlockPixels(env, bitmap);
+    if (unlockResult != 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
 JNIEXPORT jint Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeShiftPixel(
         JNIEnv *env,
         jobject,
@@ -143,6 +198,7 @@ JNIEXPORT jint Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeS
     return 0;
 }
 
+#define PADDING_BYTES_FOR_CAMERA3_JPEG_BLOB 8
 /**
  * Writes the content JPEG array to the Surface.
  *
@@ -159,9 +215,18 @@ JNIEXPORT jint Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeW
         return -1;
     }
 
-    // Updates the size of ANativeWindow_Buffer with the JPEG bytes size.
+    // Updates the size of ANativeWindow_Buffer with the JPEG bytes size. PLEASE NOTE that native
+    // layer expects jpeg bytes to contain the camera3_jpeg_blob struct at the end of the buffer.
+    // If jpeg bytes are supplied without the camera3_jpeg_blob, it is possible that the content
+    // byte matches the CAMERA3_JPEG_BLOB_ID by chance and cause the wrong jpeg size to be reported.
+    // To workaround the problem, here it adds the padding 0s to the end of the buffer so that
+    // CAMERA3_JPEG_BLOB_ID won't be matched by any chance and the total bytes size is reported
+    // as the jpeg size accordingly. The side effect of this approach is that there will be 8 zero
+    // bytes at the end of the jpeg bytes apps received.
     jsize array_size = env->GetArrayLength(jpeg_array);
-    ANativeWindow_setBuffersGeometry(window, array_size, 1, AHARDWAREBUFFER_FORMAT_BLOB);
+    ANativeWindow_setBuffersGeometry(window,
+                                     array_size + PADDING_BYTES_FOR_CAMERA3_JPEG_BLOB,
+                                     1, AHARDWAREBUFFER_FORMAT_BLOB);
 
     ANativeWindow_Buffer buffer;
     int lockResult = ANativeWindow_lock(window, &buffer, nullptr);
@@ -180,6 +245,8 @@ JNIEXPORT jint Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeW
     }
     auto *buffer_ptr = reinterpret_cast<uint8_t *>(buffer.bits);
     memcpy(buffer_ptr, jpeg_ptr, array_size);
+    // Set 0 for the padding bytes.
+    memset(buffer_ptr + array_size, 0, PADDING_BYTES_FOR_CAMERA3_JPEG_BLOB);
 
     ANativeWindow_unlockAndPost(window);
     ANativeWindow_release(window);
@@ -227,7 +294,7 @@ Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeConvertAndroid42
         return -1;
     }
 
-    libyuv::RotationMode mode = get_rotation_mode(rotation);
+    libyuv::RotationMode mode = get_rotation_mode_image_proccessing(rotation);
     bool has_rotation = rotation != 0;
 
     auto *buffer_ptr = reinterpret_cast<uint8_t *>(buffer.bits);
@@ -238,7 +305,7 @@ Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeConvertAndroid42
     uint8_t *dst_ptr = has_rotation ? converted_buffer_ptr : buffer_ptr;
     int dst_stride_y = has_rotation ? (width * 4) : (buffer.stride * 4);
 
-    int result = 0;
+    int result;
     // Apply workaround for one pixel shift issue by checking offset.
     if (start_offset_y > 0 || start_offset_u > 0 || start_offset_v > 0) {
 
@@ -253,22 +320,22 @@ Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeConvertAndroid42
         }
 
         // Convert yuv to rgb except the last line.
-        result = Android420ToABGR(src_y_ptr + start_offset_y,
-                                  src_stride_y,
-                                  src_u_ptr + start_offset_u,
-                                  src_stride_u,
-                                  src_v_ptr + start_offset_v,
-                                  src_stride_v,
-                                  src_pixel_stride_uv,
-                                  dst_ptr,
-                                  dst_stride_y,
+        result = Android420ToABGR_image_proccessing(src_y_ptr + start_offset_y,
+                                                    src_stride_y,
+                                                    src_u_ptr + start_offset_u,
+                                                    src_stride_u,
+                                                    src_v_ptr + start_offset_v,
+                                                    src_stride_v,
+                                                    src_pixel_stride_uv,
+                                                    dst_ptr,
+                                                    dst_stride_y,
                 /* is_full_swing = */true,
-                                  width,
-                                  height - 1);
+                                                    width,
+                                                    height - 1);
         if (result == 0) {
             // Convert the last row with (width - 1) pixels
             // since the last pixel's yuv data is missing.
-            result = Android420ToABGR(
+            result = Android420ToABGR_image_proccessing(
                     src_y_ptr + start_offset_y + src_stride_y * (height - 1),
                     src_stride_y - 1,
                     src_u_ptr + start_offset_u + src_stride_u * (height - 2) / 2,
@@ -300,18 +367,18 @@ Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeConvertAndroid42
             }
         }
     } else {
-        result = Android420ToABGR(src_y_ptr + start_offset_y,
-                                  src_stride_y,
-                                  src_u_ptr + start_offset_u,
-                                  src_stride_u,
-                                  src_v_ptr + start_offset_v,
-                                  src_stride_v,
-                                  src_pixel_stride_uv,
-                                  dst_ptr,
-                                  dst_stride_y,
+        result = Android420ToABGR_image_proccessing(src_y_ptr + start_offset_y,
+                                                    src_stride_y,
+                                                    src_u_ptr + start_offset_u,
+                                                    src_stride_u,
+                                                    src_v_ptr + start_offset_v,
+                                                    src_stride_v,
+                                                    src_pixel_stride_uv,
+                                                    dst_ptr,
+                                                    dst_stride_y,
                 /* is_full_swing = */true,
-                                  width,
-                                  height);
+                                                    width,
+                                                    height);
     }
 
     // TODO(b/203141655): avoid unnecessary memory copy by merging libyuv API for rotation.
@@ -328,6 +395,67 @@ Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeConvertAndroid42
     ANativeWindow_unlockAndPost(window);
     ANativeWindow_release(window);
     return result;
+}
+
+JNIEXPORT jint
+Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeConvertAndroid420ToBitmap(
+        JNIEnv *env,
+        jobject,
+        jobject src_y,
+        jint src_stride_y,
+        jobject src_u,
+        jint src_stride_u,
+        jobject src_v,
+        jint src_stride_v,
+        jint src_pixel_stride_y,
+        jint src_pixel_stride_uv,
+        jobject bitmap,
+        jint bitmap_stride,
+        jint width,
+        jint height) {
+
+    void *bitmapAddress = nullptr;
+
+    // get bitmap address
+    int lockResult = AndroidBitmap_lockPixels(env, bitmap, &bitmapAddress);
+    if (lockResult != 0) {
+        return -1;
+    }
+
+    auto *src_y_ptr =
+            static_cast<uint8_t *>(env->GetDirectBufferAddress(src_y));
+    auto *src_u_ptr =
+            static_cast<uint8_t *>(env->GetDirectBufferAddress(src_u));
+    auto *src_v_ptr =
+            static_cast<uint8_t *>(env->GetDirectBufferAddress(src_v));
+
+    int dst_stride_y = bitmap_stride;
+
+    int result = Android420ToABGR_image_proccessing(
+            src_y_ptr,
+            src_stride_y,
+            src_u_ptr,
+            src_stride_u,
+            src_v_ptr,
+            src_stride_v,
+            src_pixel_stride_uv,
+            reinterpret_cast<uint8_t *> (bitmapAddress),
+            dst_stride_y,
+            /* is_full_swing = */true,
+            width,
+            height);
+
+    if (result != 0) {
+        return -1;
+    }
+
+    // balance call to AndroidBitmap_lockPixels
+    int unlockResult = AndroidBitmap_unlockPixels(env, bitmap);
+    if (unlockResult != 0) {
+        return -1;
+    }
+
+    return 0;
 }
 
 JNIEXPORT jint Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeRotateYUV(
@@ -381,7 +509,7 @@ JNIEXPORT jint Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeR
     auto *rotated_v_ptr =
             static_cast<uint8_t *>(env->GetDirectBufferAddress(rotated_buffer_v));
 
-    libyuv::RotationMode mode = get_rotation_mode(rotation);
+    libyuv::RotationMode mode = get_rotation_mode_image_proccessing(rotation);
     bool flip_wh = (mode == libyuv::kRotate90 || mode == libyuv::kRotate270);
 
     int rotated_stride_y = flip_wh ? height : width;
@@ -393,7 +521,7 @@ JNIEXPORT jint Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeR
     int rotated_halfwidth = flip_wh ? halfheight : halfwidth;
     int rotated_halfheight = flip_wh ? halfwidth : halfheight;
 
-    int result = 0;
+    int result;
     const ptrdiff_t vu_off = src_v_ptr - src_u_ptr;
 
     if (src_pixel_stride_uv == 1) {
@@ -449,9 +577,10 @@ JNIEXPORT jint Java_dev_ragnarok_fenrir_module_ImageProcessingUtilNative_nativeR
         align_buffer_64(plane_uv, halfwidth * 2 * halfheight);
         uint8_t *dst_uv = plane_uv;
         for (int y = 0; y < halfheight; y++) {
-            weave_pixels(src_v_ptr, src_u_ptr, src_pixel_stride_uv, dst_uv, halfwidth);
-            src_u += src_stride_u;
-            src_v += src_stride_v;
+            weave_pixels_image_proccessing(src_u_ptr, src_v_ptr, src_pixel_stride_uv, dst_uv,
+                                           halfwidth);
+            src_u_ptr += src_stride_u;
+            src_v_ptr += src_stride_v;
             dst_uv += halfwidth * 2;
         }
 

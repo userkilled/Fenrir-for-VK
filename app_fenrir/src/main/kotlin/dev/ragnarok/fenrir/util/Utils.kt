@@ -15,6 +15,7 @@ import android.graphics.*
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Parcel
+import android.util.ArrayMap
 import android.util.SparseArray
 import android.util.TypedValue
 import android.view.Display
@@ -50,7 +51,9 @@ import dev.ragnarok.fenrir.link.internal.OwnerLinkSpanFactory
 import dev.ragnarok.fenrir.media.exo.OkHttpDataSource
 import dev.ragnarok.fenrir.model.*
 import dev.ragnarok.fenrir.model.Sticker.LocalSticker
+import dev.ragnarok.fenrir.module.FenrirNative
 import dev.ragnarok.fenrir.module.rlottie.RLottieDrawable
+import dev.ragnarok.fenrir.module.thorvg.ThorVGRender
 import dev.ragnarok.fenrir.place.Place
 import dev.ragnarok.fenrir.place.PlaceFactory.getOwnerWallPlace
 import dev.ragnarok.fenrir.settings.CurrentTheme
@@ -67,6 +70,7 @@ import okhttp3.*
 import java.io.Closeable
 import java.io.IOException
 import java.util.Calendar
+import java.util.Collections
 import java.util.LinkedList
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -78,7 +82,12 @@ import kotlin.math.roundToInt
 object Utils {
     private val reload_news: MutableList<Long> = LinkedList()
     private val reload_dialogs: MutableList<Long> = LinkedList()
-    private val cachedMyStickers: MutableList<LocalSticker> = ArrayList()
+    private val cachedMyStickers: MutableList<LocalSticker> = LinkedList()
+    private val registeredParcels: MutableSet<Long> = HashSet()
+    private val reactionsAssets: MutableMap<Long, MutableMap<Int, ReactionAsset>> =
+        Collections.synchronizedMap(LinkedHashMap())
+    private val reload_reactions_assets: MutableList<Long> = LinkedList()
+
     var follower_kick_mode = false
     private val displaySize = Point()
     private var device_id: String? = null
@@ -90,8 +99,26 @@ object Utils {
     var isCompressOutgoingTraffic = false
     var currentParser = 0
 
+    var currentColorsReplacement = ArrayMap<String, Int>()
+
+    fun getReactionsAssets(): MutableMap<Long, MutableMap<Int, ReactionAsset>> {
+        return reactionsAssets
+    }
+
     fun getCachedMyStickers(): MutableList<LocalSticker> {
         return cachedMyStickers
+    }
+
+    fun registerParcelNative(pointer: Long) {
+        registeredParcels.add(pointer)
+    }
+
+    fun unregisterParcelNative(pointer: Long) {
+        registeredParcels.remove(pointer)
+    }
+
+    fun isParcelNativeRegistered(pointer: Long): Boolean {
+        return registeredParcels.contains(pointer)
     }
 
     /*
@@ -108,6 +135,24 @@ object Utils {
     }
      */
 
+    fun registerColorsThorVG(context: Context) {
+        if (!FenrirNative.isNativeLoaded) {
+            return
+        }
+        val tmpMap = mapOf(
+            "primary_color" to CurrentTheme.getColorPrimary(context),
+            "secondary_color" to CurrentTheme.getColorSecondary(context),
+            "on_surface_color" to CurrentTheme.getColorOnSurface(context),
+            "white_color_contrast_fix" to CurrentTheme.getColorWhiteContrastFix(context),
+            "black_color_contrast_fix" to CurrentTheme.getColorBlackContrastFix(context)
+        )
+        if (currentColorsReplacement != tmpMap) {
+            currentColorsReplacement.clear()
+            currentColorsReplacement.putAll(tmpMap)
+            ThorVGRender.registerColors(currentColorsReplacement)
+        }
+    }
+
     fun needReloadNews(account_id: Long): Boolean {
         if (!reload_news.contains(account_id)) {
             reload_news.add(account_id)
@@ -116,6 +161,13 @@ object Utils {
         return false
     }
 
+    fun needReloadReactionAssets(account_id: Long): Boolean {
+        if (!reload_reactions_assets.contains(account_id)) {
+            reload_reactions_assets.add(account_id)
+            return true
+        }
+        return false
+    }
 
     fun needReloadDialogs(account_id: Long): Boolean {
         if (!reload_dialogs.contains(account_id)) {
@@ -125,18 +177,52 @@ object Utils {
         return false
     }
 
-
-    fun needReloadStickers(account_id: Long): Boolean {
-        Settings.get().other().get_last_stickers_sync(account_id).let {
+    fun needReloadStickerSets(account_id: Long): Boolean {
+        Settings.get().main().get_last_sticker_sets_sync(account_id).let {
             if (it <= 0 || (System.currentTimeMillis() / 1000L) - it > 900) {
-                Settings.get().other()
-                    .set_last_stickers_sync(account_id, System.currentTimeMillis() / 1000L)
+                Settings.get().main()
+                    .set_last_sticker_sets_sync(account_id, System.currentTimeMillis() / 1000L)
                 return true
             }
         }
         return false
     }
 
+    fun needReloadStickerSetsCustom(account_id: Long): Boolean {
+        Settings.get().main().get_last_sticker_sets_custom_sync(account_id).let {
+            if (it <= 0 || (System.currentTimeMillis() / 1000L) - it > 400) {
+                Settings.get().main()
+                    .set_last_sticker_sets_custom_sync(
+                        account_id,
+                        System.currentTimeMillis() / 1000L
+                    )
+                return true
+            }
+        }
+        return false
+    }
+
+    fun needReloadStickerKeywords(account_id: Long): Boolean {
+        Settings.get().main().get_last_sticker_keywords_sync(account_id).let {
+            if (it <= 0 || (System.currentTimeMillis() / 1000L) - it > 3600) {
+                Settings.get().main()
+                    .set_last_sticker_keywords_sync(account_id, System.currentTimeMillis() / 1000L)
+                return true
+            }
+        }
+        return false
+    }
+
+    fun needFetchReactionAssets(account_id: Long): Boolean {
+        Settings.get().main().get_last_reaction_assets_sync(account_id).let {
+            if (it <= 0 || (System.currentTimeMillis() / 1000L) - it > 3600) {
+                Settings.get().main()
+                    .set_last_reaction_assets_sync(account_id, System.currentTimeMillis() / 1000L)
+                return true
+            }
+        }
+        return false
+    }
 
     inline fun <reified T> lastOf(data: List<T>): T {
         return data[data.size - 1]
@@ -681,6 +767,29 @@ object Utils {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     }
 
+    fun hasUpsideDownCake(): Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+    }
+
+    @Suppress("deprecation")
+    fun finishActivityImmediate(activity: Activity) {
+        activity.finish()
+        if (!hasUpsideDownCake()) {
+            activity.overridePendingTransition(0, 0)
+        } else {
+            activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        }
+    }
+
+    @Suppress("deprecation")
+    fun activityTransactionImmediate(activity: Activity) {
+        if (!hasUpsideDownCake()) {
+            activity.overridePendingTransition(0, 0)
+        } else {
+            activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, 0, 0)
+        }
+    }
+
     fun indexOf(data: List<Identificable>?, id: Int): Int {
         data ?: return -1
         for (i in data.indices) {
@@ -956,7 +1065,7 @@ object Utils {
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            drawable.colorFilter = BlendModeColorFilter(color, BlendMode.MODULATE)
+            drawable.colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY)
         } else {
             drawable.setColorFilter(color, PorterDuff.Mode.MULTIPLY)
         }
@@ -967,7 +1076,7 @@ object Utils {
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            view.colorFilter = BlendModeColorFilter(color, BlendMode.MODULATE)
+            view.colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY)
         } else {
             view.setColorFilter(color, PorterDuff.Mode.MULTIPLY)
         }
@@ -978,7 +1087,7 @@ object Utils {
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            view.colorFilter = BlendModeColorFilter(color, BlendMode.MODULATE)
+            view.colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY)
         } else {
             view.setColorFilter(color, PorterDuff.Mode.MULTIPLY)
         }
@@ -1256,41 +1365,11 @@ object Utils {
         return false
     }
 
-
-    fun safeObjectCall(obj: Any?, function: SafeCallInt) {
-        if (obj != null) {
-            function.call()
-        }
-    }
-
-
     fun safeCheck(obj: CharSequence?, function: SafeCallCheckInt): Boolean {
         return if (obj.nonNullNoEmpty()) {
             function.check()
         } else false
     }
-
-
-    fun safeCall(obj: CharSequence?, function: SafeCallInt) {
-        if (obj.nonNullNoEmpty()) {
-            function.call()
-        }
-    }
-
-
-    fun safeCall(obj: Collection<*>?, function: SafeCallInt) {
-        if (obj.nonNullNoEmpty()) {
-            function.call()
-        }
-    }
-
-
-    fun safeCall(data: Map<*, *>?, function: SafeCallInt) {
-        if (data.nonNullNoEmpty()) {
-            function.call()
-        }
-    }
-
 
     fun clamp(value: Int, min: Int, max: Int): Int {
         if (value > max) {
@@ -1441,7 +1520,7 @@ object Utils {
 
 
     val appLocale: Locale
-        get() = getLocaleSettings(Settings.get().other().language)
+        get() = getLocaleSettings(Settings.get().main().language)
 
     @Suppress("DEPRECATION")
 
@@ -1471,7 +1550,7 @@ object Utils {
             Constants.DEVICE_COUNTRY_CODE = "ru"
         }
         val size = Settings.get().main().fontSize
-        @Lang val lang = Settings.get().other().language
+        @Lang val lang = Settings.get().main().language
         val locale = getLocaleSettings(lang)
         updateDateLang(locale)
         updateDateLang()

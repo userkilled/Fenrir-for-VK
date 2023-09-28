@@ -26,6 +26,9 @@
 #ifndef TAGLIB_MPEGHEADER_H
 #define TAGLIB_MPEGHEADER_H
 
+#include <memory>
+
+#include "taglib.h"
 #include "taglib_export.h"
 
 namespace TagLib {
@@ -48,20 +51,13 @@ namespace TagLib {
     {
     public:
       /*!
-       * Parses an MPEG header based on \a data.
-       *
-       * \deprecated Use Header(File *, long, bool).
-       */
-      TAGLIB_DEPRECATED Header(const ByteVector &data);
-
-      /*!
        * Parses an MPEG header based on \a file and \a offset.
        *
        * \note If \a checkLength is true, this requires the next MPEG frame to
        * check if the frame length is parsed and calculated correctly.  So it's
        * suitable for seeking for the first valid frame.
        */
-      Header(File *file, long offset, bool checkLength = true);
+      Header(File *file, offset_t offset, bool checkLength = true);
 
       /*!
        * Does a shallow copy of \a h.
@@ -167,10 +163,10 @@ namespace TagLib {
       Header &operator=(const Header &h);
 
     private:
-      void parse(File *file, long offset, bool checkLength);
+      void parse(File *file, offset_t offset, bool checkLength);
 
       class HeaderPrivate;
-      HeaderPrivate *d;
+      std::shared_ptr<HeaderPrivate> d;
     };
   }  // namespace MPEG
 }  // namespace TagLib

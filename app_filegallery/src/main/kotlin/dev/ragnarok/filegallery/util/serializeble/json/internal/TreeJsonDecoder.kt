@@ -7,9 +7,23 @@
 
 package dev.ragnarok.filegallery.util.serializeble.json.internal
 
-import dev.ragnarok.filegallery.util.serializeble.json.*
+import dev.ragnarok.filegallery.util.serializeble.json.Json
+import dev.ragnarok.filegallery.util.serializeble.json.JsonArray
+import dev.ragnarok.filegallery.util.serializeble.json.JsonDecoder
+import dev.ragnarok.filegallery.util.serializeble.json.JsonElement
+import dev.ragnarok.filegallery.util.serializeble.json.JsonLiteral
+import dev.ragnarok.filegallery.util.serializeble.json.JsonNull
+import dev.ragnarok.filegallery.util.serializeble.json.JsonObject
+import dev.ragnarok.filegallery.util.serializeble.json.JsonPrimitive
+import dev.ragnarok.filegallery.util.serializeble.json.booleanOrNull
+import dev.ragnarok.filegallery.util.serializeble.json.contentOrNull
+import dev.ragnarok.filegallery.util.serializeble.json.double
+import dev.ragnarok.filegallery.util.serializeble.json.float
+import dev.ragnarok.filegallery.util.serializeble.json.int
 import dev.ragnarok.filegallery.util.serializeble.json.internal.lexer.StringJsonLexer
 import dev.ragnarok.filegallery.util.serializeble.json.internal.lexer.lenientHint
+import dev.ragnarok.filegallery.util.serializeble.json.long
+import dev.ragnarok.filegallery.util.serializeble.json.schemaCache
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
@@ -57,7 +71,7 @@ private sealed class AbstractJsonTreeDecoder(
     @JvmField
     protected val configuration = json.configuration
 
-    private fun currentObject() = currentTagOrNull?.let { currentElement(it) } ?: value
+    protected fun currentObject() = currentTagOrNull?.let { currentElement(it) } ?: value
 
     override fun decodeJsonElement(): JsonElement = currentObject()
 
@@ -167,7 +181,11 @@ private sealed class AbstractJsonTreeDecoder(
     }
 
     private fun unparsedPrimitive(primitive: String): Nothing {
-        throw JsonDecodingException(-1, "Failed to parse '$primitive'", currentObject().toString())
+        throw JsonDecodingException(
+            -1,
+            "Failed to parse literal as '$primitive' value",
+            currentObject().toString()
+        )
     }
 
     override fun decodeTaggedString(tag: String): String {
@@ -191,7 +209,7 @@ private sealed class AbstractJsonTreeDecoder(
     private fun JsonPrimitive.asLiteral(type: String): JsonLiteral {
         return this as? JsonLiteral ?: throw JsonDecodingException(
             -1,
-            "Unexpected 'null' when $type was expected"
+            "Unexpected 'null' literal when non-nullable $type was expected"
         )
     }
 
@@ -202,9 +220,14 @@ private sealed class AbstractJsonTreeDecoder(
             ), json
         )
         else super.decodeTaggedInline(tag, inlineDescriptor)
+
+    override fun decodeInline(descriptor: SerialDescriptor): Decoder {
+        return if (currentTagOrNull != null) super.decodeInline(descriptor)
+        else JsonPrimitiveDecoder(json, value).decodeInline(descriptor)
+    }
 }
 
-private class JsonPrimitiveDecoder(json: Json, override val value: JsonPrimitive) :
+private class JsonPrimitiveDecoder(json: Json, override val value: JsonElement) :
     AbstractJsonTreeDecoder(json, value) {
 
     init {
@@ -290,11 +313,14 @@ private open class JsonTreeDecoder(
     override fun currentElement(tag: String): JsonElement = value.getValue(tag)
 
     override fun beginStructure(descriptor: SerialDescriptor): CompositeDecoder {
-        /*
-         * For polymorphic serialization we'd like to avoid excessive decoder creating in
-         * beginStructure to properly preserve 'polyDiscriminator' field and filter it out.
-         */
-        if (descriptor === polyDescriptor) return this
+        // polyDiscriminator needs to be preserved so the check for unknown keys
+        // in endStructure can filter polyDiscriminator out.
+        if (descriptor === polyDescriptor) {
+            return JsonTreeDecoder(
+                json, cast(currentObject(), polyDescriptor), polyDiscriminator, polyDescriptor
+            )
+        }
+
         return super.beginStructure(descriptor)
     }
 

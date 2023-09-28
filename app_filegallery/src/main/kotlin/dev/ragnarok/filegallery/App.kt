@@ -9,6 +9,7 @@ import dev.ragnarok.filegallery.activity.crash.CrashUtils
 import dev.ragnarok.filegallery.media.music.MusicPlaybackController
 import dev.ragnarok.filegallery.picasso.PicassoInstance
 import dev.ragnarok.filegallery.settings.Settings
+import dev.ragnarok.filegallery.util.Camera2ImageProcessingUtil
 import dev.ragnarok.filegallery.util.ErrorLocalizer
 import dev.ragnarok.filegallery.util.Utils
 import dev.ragnarok.filegallery.util.existfile.FileExistJVM
@@ -21,8 +22,8 @@ class App : Application() {
         sInstanse = this
 
         super.onCreate()
-        AppCompatDelegate.setDefaultNightMode(Settings.get().main().getNightMode())
-        if (Settings.get().main().isDeveloper_mode()) {
+        AppCompatDelegate.setDefaultNightMode(Settings.get().main().nightMode)
+        if (Settings.get().main().isDeveloper_mode) {
             CrashUtils.install(this)
         }
 
@@ -44,14 +45,13 @@ class App : Application() {
         } else {
             MusicPlaybackController.tracksExist = FileExistJVM()
         }
-        MusicPlaybackController.registerBroadcast(this)
         Utils.isCompressIncomingTraffic = Settings.get().main().isCompress_incoming_traffic
         Utils.currentParser = Settings.get().main().currentParser
         PicassoInstance.init(this)
         RxJavaPlugins.setErrorHandler {
             it.printStackTrace()
             Handler(mainLooper).post {
-                if (Settings.get().main().isDeveloper_mode()) {
+                if (Settings.get().main().isDeveloper_mode) {
                     createCustomToast(this, null)?.showToastError(
                         ErrorLocalizer.localizeThrowable(
                             this,

@@ -6,18 +6,20 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.Drawable
 import android.media.audiofx.AudioEffect
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
-import android.os.SystemClock
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.media.session.MediaButtonReceiver
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -50,16 +52,16 @@ import dev.ragnarok.fenrir.util.Logger
 import dev.ragnarok.fenrir.util.Utils
 import dev.ragnarok.fenrir.util.Utils.makeMediaItem
 import dev.ragnarok.fenrir.util.rxutils.RxUtils
+import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.disposables.CompositeDisposable
+import io.reactivex.rxjava3.disposables.Disposable
 import java.lang.ref.WeakReference
+import java.util.concurrent.TimeUnit
 
 class MusicPlaybackService : Service() {
-    private val SHUTDOWN = "dev.ragnarok.fenrir.media.music.shutdown"
     private val mBinder: IBinder = ServiceStub(this)
     private var mPlayer: MultiPlayer? = null
-    private var mAlarmManager: AlarmManager? = null
-    private var mShutdownIntent: PendingIntent? = null
-    private var mShutdownScheduled = false
+    private var shutdownDelayedDisposable = Disposable.disposed()
     var isPlaying = false
         private set
 
@@ -83,9 +85,11 @@ class MusicPlaybackService : Service() {
     private var mMediaMetadataCompat: MediaMetadataCompat? = null
     private var inForeground: Boolean = false
     private var wakeLock: PowerManager.WakeLock? = null
+    private var mIntentReceiver: BroadcastReceiver? = null
     override fun onBind(intent: Intent): IBinder {
         if (Constants.IS_DEBUG) Logger.d(TAG, "Service bound, intent = $intent")
         cancelShutdown()
+        mAnyActivityInForeground = false
         return mBinder
     }
 
@@ -98,7 +102,15 @@ class MusicPlaybackService : Service() {
                 mManager.notify(id, notification)
                 return
             }
-            startForeground(id, notification)
+            if (Utils.hasQ()) {
+                startForeground(
+                    id,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                startForeground(id, notification)
+            }
             inForeground = true
         } catch (ignored: Exception) {
         }
@@ -107,6 +119,9 @@ class MusicPlaybackService : Service() {
     @SuppressLint("WrongConstant")
     @Suppress("deprecation")
     fun outForeground(removeNotification: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !removeNotification) {
+            return
+        }
         inForeground = false
         if (Utils.hasNougat()) {
             stopForeground(if (removeNotification) STOP_FOREGROUND_REMOVE else 0)
@@ -124,13 +139,14 @@ class MusicPlaybackService : Service() {
             )
             return true
         }
-        stopSelf()
         Logger.d(TAG, "onUnbind, stopSelf(mServiceStartId)")
+        terminate()
         return true
     }
 
     override fun onRebind(intent: Intent) {
         cancelShutdown()
+        mAnyActivityInForeground = false
     }
 
     override fun onCreate() {
@@ -144,7 +160,7 @@ class MusicPlaybackService : Service() {
         mNotificationHelper = NotificationHelper(this)
         setUpRemoteControlClient()
 
-        IDLE_DELAY = Settings.get().other().musicLifecycle
+        IDLE_DELAY = Settings.get().main().musicLifecycle
 
         mPlayer = MultiPlayer(this)
         val filter = IntentFilter()
@@ -157,21 +173,24 @@ class MusicPlaybackService : Service() {
         filter.addAction(PREVIOUS_ACTION)
         filter.addAction(REPEAT_ACTION)
         filter.addAction(SHUFFLE_ACTION)
-        registerReceiver(mIntentReceiver, filter)
 
-        // Initialize the delayed shutdown intent
-        val shutdownIntent = Intent(this, MusicPlaybackService::class.java)
-        shutdownIntent.action = SHUTDOWN
-        mAlarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager?
-        mShutdownIntent =
-            PendingIntent.getService(this, 0, shutdownIntent, Utils.makeMutablePendingIntent(0))
+        mIntentReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                handleCommandIntent(intent)
+            }
+        }
+        ContextCompat.registerReceiver(
+            this,
+            mIntentReceiver,
+            filter,
+            ContextCompat.RECEIVER_EXPORTED
+        )
 
         // Listen for the idle state
         scheduleDelayedShutdown()
         notifyChange(META_CHANGED)
     }
 
-    @Suppress("DEPRECATION")
     private fun setUpRemoteControlClient() {
         mMediaSession =
             MediaSessionCompat(application, resources.getString(R.string.app_name), null, null)
@@ -223,7 +242,7 @@ class MusicPlaybackService : Service() {
                 super.onStop()
                 pause()
                 Logger.d(javaClass.simpleName, "Stopping services. onStop()")
-                stopSelf()
+                terminate()
             }
 
             override fun onSeekTo(pos: Long) {
@@ -232,20 +251,32 @@ class MusicPlaybackService : Service() {
             }
         }
 
-    @Suppress("DEPRECATION")
     override fun onDestroy() {
+        shutdownDelayedDisposable.dispose()
         wakeLock?.release()
+        wakeLock = null
         if (Constants.IS_DEBUG) Logger.d(TAG, "Destroying service")
-        super.onDestroy()
         val audioEffectsIntent = Intent(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)
         audioEffectsIntent.putExtra(AudioEffect.EXTRA_AUDIO_SESSION, audioSessionId)
         audioEffectsIntent.putExtra(AudioEffect.EXTRA_PACKAGE_NAME, packageName)
         sendBroadcast(audioEffectsIntent)
-        mShutdownIntent?.let { mAlarmManager?.cancel(it) }
         mPlayer?.release()
+        mPlayer = null
         mMediaSession?.release()
+        mMediaSession = null
+        mIntentReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                if (Constants.IS_DEBUG) {
+                    e.printStackTrace()
+                }
+            }
+        }
+        mIntentReceiver = null
         mNotificationHelper?.killNotification()
-        unregisterReceiver(mIntentReceiver)
+        mNotificationHelper = null
+        super.onDestroy()
     }
 
     /**
@@ -253,34 +284,26 @@ class MusicPlaybackService : Service() {
      */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (Constants.IS_DEBUG) Logger.d(TAG, "Got new intent $intent, startId = $startId")
-        if (intent != null) {
-            val action = intent.action
-            if (intent.hasExtra(NOW_IN_FOREGROUND)) {
-                mAnyActivityInForeground = intent.getBooleanExtra(NOW_IN_FOREGROUND, false)
-                updateNotification()
-            }
-            if (SHUTDOWN == action) {
-                mShutdownScheduled = false
-                releaseServiceUiAndStop()
-                return START_NOT_STICKY
-            }
-            handleCommandIntent(intent)
-            MediaButtonReceiver.handleIntent(mMediaSession, intent)
+        intent?.let {
+            handleCommandIntent(it)
+            MediaButtonReceiver.handleIntent(mMediaSession, it)
         }
         scheduleDelayedShutdown()
         return START_STICKY
     }
 
-    @Suppress("DEPRECATION")
+    internal fun terminate() {
+        if (!stopSelfResult(-1)) {
+            onDestroy()
+        }
+    }
+
     internal fun releaseServiceUiAndStop() {
-        if (isPlaying) {
+        if (isPlaying || mAnyActivityInForeground) {
             return
         }
         if (Constants.IS_DEBUG) Logger.d(TAG, "Nothing is playing anymore, releasing notification")
-        mNotificationHelper?.killNotification()
-        if (!mAnyActivityInForeground) {
-            stopSelf()
-        }
+        terminate()
     }
 
     internal fun handleCommandIntent(intent: Intent) {
@@ -291,7 +314,7 @@ class MusicPlaybackService : Service() {
             "handleCommandIntent: action = $action, command = $command"
         )
         if (SWIPE_DISMISS_ACTION == action) {
-            stopSelf()
+            terminate()
         }
         if (CMDNEXT == command || NEXT_ACTION == action) {
             mTransportController?.skipToNext()
@@ -352,25 +375,20 @@ class MusicPlaybackService : Service() {
     }
 
     private fun scheduleDelayedShutdown() {
+        shutdownDelayedDisposable.dispose()
         if (Constants.IS_DEBUG) Log.v(TAG, "Scheduling shutdown in $IDLE_DELAY ms")
-        mShutdownIntent?.let {
-            mAlarmManager?.set(
-                AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + IDLE_DELAY,
-                it
-            )
-        }
-        mShutdownScheduled = true
+        shutdownDelayedDisposable = Observable.just(Any())
+            .delay(IDLE_DELAY.toLong(), TimeUnit.MILLISECONDS)
+            .toMainThread()
+            .subscribe { terminate() }
     }
 
     private fun cancelShutdown() {
         if (Constants.IS_DEBUG) Logger.d(
             TAG,
-            "Cancelling delayed shutdown, scheduled = $mShutdownScheduled"
+            "Cancelling delayed shutdown"
         )
-        if (mShutdownScheduled) {
-            mShutdownIntent?.let { mAlarmManager?.cancel(it) }
-            mShutdownScheduled = false
-        }
+        shutdownDelayedDisposable.dispose()
     }
 
     /**
@@ -448,7 +466,7 @@ class MusicPlaybackService : Service() {
         if (what == POSITION_CHANGED) {
             return
         }
-        sendBroadcast(Intent(what))
+        MusicPlaybackController.publishFromServiceState(what)
         if (what == PLAYSTATE_CHANGED) {
             mNotificationHelper?.updatePlayState(isPlaying)
         }
@@ -528,7 +546,7 @@ class MusicPlaybackService : Service() {
                 return
             }
 
-            if (Settings.get().other().isForce_cache && TrackIsDownloaded(audio) == 1)
+            if (Settings.get().main().isForce_cache && TrackIsDownloaded(audio) == 1)
                 audio.setUrl(GetLocalTrackLink(audio))
             if (UpdateMeta) {
                 errorsCount = 0
@@ -569,6 +587,12 @@ class MusicPlaybackService : Service() {
         get() {
             synchronized(this) { return mPlayer?.bufferPercent ?: 0 }
         }
+
+    fun doNotDestroyWhenActivityRecreated() {
+        synchronized(this) {
+            mAnyActivityInForeground = true
+        }
+    }
 
     val bufferPos: Long
         get() {
@@ -746,10 +770,7 @@ class MusicPlaybackService : Service() {
     fun canPlayAfterCurrent(audio: Audio): Boolean {
         synchronized(this) {
             val current = currentTrackNotSyncPos
-            if (mPlayList.isNullOrEmpty() || current == -1 || mPlayList?.get(current) == audio) {
-                return false
-            }
-            return true
+            return !(mPlayList.isNullOrEmpty() || current == -1 || mPlayList?.get(current) == audio)
         }
     }
 
@@ -934,19 +955,13 @@ class MusicPlaybackService : Service() {
         notifyChange(REFRESH)
     }
 
-    private val mIntentReceiver: BroadcastReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            handleCommandIntent(intent)
-        }
-    }
-
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     private class MultiPlayer(service: MusicPlaybackService) {
         val mService: WeakReference<MusicPlaybackService> = WeakReference(service)
         var mCurrentMediaPlayer: ExoPlayer = ExoPlayer.Builder(
             service, DefaultRenderersFactory(service)
                 .setExtensionRendererMode(
-                    when (Settings.get().other().fFmpegPlugin) {
+                    when (Settings.get().main().fFmpegPlugin) {
                         0 -> EXTENSION_RENDERER_MODE_OFF
                         1 -> EXTENSION_RENDERER_MODE_ON
                         2 -> EXTENSION_RENDERER_MODE_PREFER
@@ -1016,7 +1031,7 @@ class MusicPlaybackService : Service() {
                     audio
                 )
                 if (Settings.get()
-                        .other()
+                        .main()
                         .isAudioBroadcastActive
                 ) {
                     single = single.andThen(
@@ -1138,7 +1153,7 @@ class MusicPlaybackService : Service() {
                         it.errorsCount++
                         if (it.errorsCount > 10) {
                             it.errorsCount = 0
-                            it.stopSelf()
+                            it.terminate()
                         } else {
                             val playbackPos = mCurrentMediaPlayer.currentPosition
                             it.playCurrentTrack(false)
@@ -1294,6 +1309,9 @@ class MusicPlaybackService : Service() {
             return mService.get()?.bufferPos ?: 0
         }
 
+        override fun doNotDestroyWhenActivityRecreated() {
+            mService.get()?.doNotDestroyWhenActivityRecreated()
+        }
     }
 
     companion object {
@@ -1315,11 +1333,6 @@ class MusicPlaybackService : Service() {
         const val REPEAT_ACTION = "dev.ragnarok.fenrir.media.music.repeat"
         const val SHUFFLE_ACTION = "dev.ragnarok.fenrir.media.music.shuffle"
 
-        /**
-         * Called to update the service about the foreground state of Apollo's activities
-         */
-        const val FOREGROUND_STATE_CHANGED = "dev.ragnarok.fenrir.media.music.fgstatechanged"
-        const val NOW_IN_FOREGROUND = "nowinforeground"
         const val REFRESH = "dev.ragnarok.fenrir.media.music.refresh"
 
         /**

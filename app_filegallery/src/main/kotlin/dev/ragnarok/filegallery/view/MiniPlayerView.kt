@@ -3,9 +3,6 @@ package dev.ragnarok.filegallery.view
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
-import android.os.Handler
-import android.os.Looper
-import android.os.Message
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.View
@@ -28,17 +25,19 @@ import dev.ragnarok.filegallery.settings.Settings
 import dev.ragnarok.filegallery.toMainThread
 import dev.ragnarok.filegallery.util.Utils
 import dev.ragnarok.filegallery.view.natives.rlottie.RLottieImageView
+import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.disposables.Disposable
-import java.lang.ref.WeakReference
+import java.util.concurrent.TimeUnit
 
 class MiniPlayerView : FrameLayout, CustomSeekBar.CustomSeekBarListener {
     private var mPlayerDisposable = Disposable.disposed()
+    private var mAccountDisposable = Disposable.disposed()
+    private var mRefreshDisposable = Disposable.disposed()
     private lateinit var visual: RLottieImageView
     private lateinit var playCover: ImageView
     private lateinit var title: TextView
     private lateinit var mProgress: CustomSeekBar
     private lateinit var root: View
-    private var mTimeHandler: TimeHandler? = null
 
     constructor(context: Context) : super(context) {
         init()
@@ -57,12 +56,15 @@ class MiniPlayerView : FrameLayout, CustomSeekBar.CustomSeekBarListener {
     }
 
     private fun init() {
+        if (isInEditMode) {
+            return
+        }
         root = LayoutInflater.from(context).inflate(R.layout.mini_player, this)
         val play = root.findViewById<View>(R.id.item_audio_play)
         playCover = root.findViewById(R.id.item_audio_play_cover)
         visual = root.findViewById(R.id.item_audio_visual)
         root.visibility =
-            if (isInEditMode || MusicPlaybackController.miniPlayerVisibility) VISIBLE else GONE
+            if (MusicPlaybackController.miniPlayerVisibility) VISIBLE else GONE
         val mPClosePlay = root.findViewById<ImageButton>(R.id.close_player)
         mPClosePlay.setOnClickListener {
             MusicPlaybackController.closeMiniPlayer()
@@ -98,23 +100,26 @@ class MiniPlayerView : FrameLayout, CustomSeekBar.CustomSeekBarListener {
         mProgress.setCustomSeekBarListener(this)
     }
 
-    internal fun queueNextRefresh(delay: Long) {
-        mTimeHandler?.let {
-            val message = it.obtainMessage(REFRESH_TIME)
-            it.removeMessages(REFRESH_TIME)
-            it.sendMessageDelayed(message, delay)
-        }
+    private fun queueNextRefresh() {
+        mRefreshDisposable.dispose()
+        mRefreshDisposable = Observable.just(Any())
+            .delay(500, TimeUnit.MILLISECONDS)
+            .toMainThread()
+            .subscribe {
+                refreshCurrentTime()
+                queueNextRefresh()
+            }
     }
 
     private val transformCover: Transformation
         get() = if (Settings.get()
-                .main().isAudio_round_icon()
+                .main().isAudio_round_icon
         ) RoundTransformation() else PolyTransformation()
 
     @get:DrawableRes
     private val audioCoverSimple: Int
         get() = if (Settings.get()
-                .main().isAudio_round_icon()
+                .main().isAudio_round_icon
         ) R.drawable.audio_button else R.drawable.audio_button_material
 
     private fun updatePlaybackControls() {
@@ -196,10 +201,10 @@ class MiniPlayerView : FrameLayout, CustomSeekBar.CustomSeekBarListener {
         //mProgress.setIndeterminate(preparing);
     }
 
-    internal fun refreshCurrentTime(): Long {
+    private fun refreshCurrentTime() {
         if (!MusicPlaybackController.isInitialized) {
             mProgress.updateFullState(-1, -1, -1)
-            return 500
+            return
         }
         try {
             val pos = MusicPlaybackController.position()
@@ -207,24 +212,24 @@ class MiniPlayerView : FrameLayout, CustomSeekBar.CustomSeekBarListener {
             if (pos >= 0 && duration > 0) {
                 mProgress.updateFullState(duration, pos, MusicPlaybackController.bufferPosition())
                 if (!MusicPlaybackController.isPlaying) {
-                    return 500
+                    return
                 }
             } else {
                 mProgress.updateFullState(-1, -1, -1)
-                return 500
+                return
             }
-            return 300
         } catch (ignored: Exception) {
         }
-        return 500
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        if (isInEditMode) {
+            return
+        }
         receiveFullAudioInfo()
-        mTimeHandler = TimeHandler(this)
-        val next = refreshCurrentTime()
-        queueNextRefresh(next)
+        refreshCurrentTime()
+        queueNextRefresh()
         mPlayerDisposable = MusicPlaybackController.observeServiceBinding()
             .toMainThread()
             .subscribe { onServiceBindEvent(it) }
@@ -232,24 +237,12 @@ class MiniPlayerView : FrameLayout, CustomSeekBar.CustomSeekBarListener {
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        mPlayerDisposable.dispose()
-        mTimeHandler?.removeMessages(REFRESH_TIME)
-        mTimeHandler = null
-    }
-
-    private class TimeHandler(player: MiniPlayerView?) :
-        Handler(Looper.getMainLooper()) {
-        private val mAudioPlayer: WeakReference<MiniPlayerView?> = WeakReference(player)
-        override fun handleMessage(msg: Message) {
-            if (msg.what == REFRESH_TIME) {
-                mAudioPlayer.get()?.let { it.queueNextRefresh(it.refreshCurrentTime()) }
-            }
+        if (isInEditMode) {
+            return
         }
-
-    }
-
-    companion object {
-        private const val REFRESH_TIME = 1
+        mPlayerDisposable.dispose()
+        mAccountDisposable.dispose()
+        mRefreshDisposable.dispose()
     }
 
     override fun onSeekBarDrag(position: Long) {

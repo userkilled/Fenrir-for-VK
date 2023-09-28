@@ -2,14 +2,19 @@ package dev.ragnarok.filegallery.activity
 
 import android.Manifest
 import android.app.Activity
-import android.content.*
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.ComponentName
+import android.content.Context
+import android.content.DialogInterface
+import android.content.Intent
+import android.content.ServiceConnection
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.IBinder
 import android.view.MenuItem
-import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -22,6 +27,7 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.iterator
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentContainerView
@@ -44,12 +50,15 @@ import dev.ragnarok.filegallery.fragment.tagdir.TagDirFragment
 import dev.ragnarok.filegallery.fragment.tagowner.TagOwnerFragment
 import dev.ragnarok.filegallery.fragment.theme.ThemeFragment
 import dev.ragnarok.filegallery.fromIOToMain
-import dev.ragnarok.filegallery.listener.*
+import dev.ragnarok.filegallery.listener.AppStyleable
+import dev.ragnarok.filegallery.listener.BackPressCallback
+import dev.ragnarok.filegallery.listener.CanBackPressedCallback
+import dev.ragnarok.filegallery.listener.OnSectionResumeCallback
+import dev.ragnarok.filegallery.listener.UpdatableNavigation
 import dev.ragnarok.filegallery.media.music.MusicPlaybackController
 import dev.ragnarok.filegallery.media.music.MusicPlaybackController.ServiceToken
 import dev.ragnarok.filegallery.media.music.MusicPlaybackService
 import dev.ragnarok.filegallery.modalbottomsheetdialogfragment.ModalBottomSheetDialogFragment
-import dev.ragnarok.filegallery.modalbottomsheetdialogfragment.Option
 import dev.ragnarok.filegallery.modalbottomsheetdialogfragment.OptionRequest
 import dev.ragnarok.filegallery.model.SectionItem
 import dev.ragnarok.filegallery.nonNullNoEmpty
@@ -88,7 +97,6 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
     private var mViewFragment: FragmentContainerView? = null
     private var mLastBackPressedTime: Long = 0
     private val DOUBLE_BACK_PRESSED_TIMEOUT = 2000
-    private var mDestroyed = false
     private var mAudioPlayServiceToken: ServiceToken? = null
     private val TAG = "MainActivity_LOG"
     private val mCompositeDisposable = CompositeDisposable()
@@ -137,11 +145,10 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
         setTheme(currentStyle())
         Utils.prepareDensity(this)
         super.onCreate(savedInstanceState)
-        mDestroyed = false
 
         savedInstanceState ?: run {
             if (Settings.get().security().isUsePinForEntrance && Settings.get().security()
-                    .hasPinHash()
+                    .hasPinHash
             ) {
                 startEnterPinActivity()
             } else {
@@ -157,7 +164,7 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
         supportFragmentManager.addOnBackStackChangedListener(mOnBackStackChangedListener)
         resolveToolbarNavigationIcon()
         savedInstanceState ?: run {
-            if (Settings.get().main().getLocalServer().enabled_audio_local_sync) {
+            if (Settings.get().main().localServer.enabled_audio_local_sync) {
                 mCompositeDisposable.add(MusicPlaybackController.tracksExist.findAllAudios(
                     this
                 )
@@ -165,7 +172,7 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
                     .subscribe(
                         RxUtils.dummy()
                     ) { t: Throwable? ->
-                        if (Settings.get().main().isDeveloper_mode()) {
+                        if (Settings.get().main().isDeveloper_mode) {
                             createCustomToast(
                                 this,
                                 mViewFragment,
@@ -179,7 +186,7 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
                 .subscribe(
                     RxUtils.dummy()
                 ) { t: Throwable? ->
-                    if (Settings.get().main().isDeveloper_mode()) {
+                    if (Settings.get().main().isDeveloper_mode) {
                         createCustomToast(this, mViewFragment, mBottomNavigation)
                             ?.showToastThrowable(t)
                     }
@@ -193,7 +200,7 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
                         return
                     }
                 }
-                if (supportFragmentManager.backStackEntryCount == 1) {
+                if (supportFragmentManager.backStackEntryCount == 1 || supportFragmentManager.backStackEntryCount <= 0) {
                     if (mLastBackPressedTime < 0
                         || mLastBackPressedTime + DOUBLE_BACK_PRESSED_TIMEOUT > System.currentTimeMillis()
                     ) {
@@ -256,14 +263,29 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
             mToolbar?.setNavigationIcon(R.drawable.client_round)
             mToolbar?.setNavigationOnClickListener {
                 val menus = ModalBottomSheetDialogFragment.Builder()
-                menus.add(
-                    OptionRequest(
-                        0,
-                        getString(R.string.night_mode_title),
-                        R.drawable.ic_outline_nights_stay,
-                        false
+                if (Settings.get()
+                        .main().nightMode == AppCompatDelegate.MODE_NIGHT_YES || Settings.get()
+                        .main().nightMode == AppCompatDelegate.MODE_NIGHT_AUTO_BATTERY || Settings.get()
+                        .main().nightMode == AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                ) {
+                    menus.add(
+                        OptionRequest(
+                            0,
+                            getString(R.string.day_mode_title),
+                            R.drawable.ic_outline_wb_sunny,
+                            false
+                        )
                     )
-                )
+                } else {
+                    menus.add(
+                        OptionRequest(
+                            0,
+                            getString(R.string.night_mode_title),
+                            R.drawable.ic_outline_nights_stay,
+                            false
+                        )
+                    )
+                }
                 menus.add(
                     OptionRequest(
                         1,
@@ -274,36 +296,34 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
                 )
                 menus.show(
                     supportFragmentManager,
-                    "left_options",
-                    object : ModalBottomSheetDialogFragment.Listener {
-                        override fun onModalOptionSelected(option: Option) {
-                            when {
-                                option.id == 0 -> {
-                                    if (Settings.get().main()
-                                            .getNightMode() == AppCompatDelegate.MODE_NIGHT_YES || Settings.get()
-                                            .main()
-                                            .getNightMode() == AppCompatDelegate.MODE_NIGHT_AUTO_BATTERY || Settings.get()
-                                            .main()
-                                            .getNightMode() == AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-                                    ) {
-                                        Settings.get().main()
-                                            .switchNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-                                        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-                                    } else {
-                                        Settings.get().main()
-                                            .switchNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                                        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                                    }
-                                }
-
-                                option.id == 1 && FenrirNative.isNativeLoaded -> {
-                                    val intent =
-                                        Intent(this@MainActivity, CameraScanActivity::class.java)
-                                    requestQRScan.launch(intent)
-                                }
+                    "left_options"
+                ) { _, option ->
+                    when {
+                        option.id == 0 -> {
+                            if (Settings.get().main()
+                                    .nightMode == AppCompatDelegate.MODE_NIGHT_YES || Settings.get()
+                                    .main()
+                                    .nightMode == AppCompatDelegate.MODE_NIGHT_AUTO_BATTERY || Settings.get()
+                                    .main()
+                                    .nightMode == AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                            ) {
+                                Settings.get().main()
+                                    .switchNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                            } else {
+                                Settings.get().main()
+                                    .switchNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
                             }
                         }
-                    })
+
+                        option.id == 1 && FenrirNative.isNativeLoaded -> {
+                            val intent =
+                                Intent(this@MainActivity, CameraScanActivity::class.java)
+                            requestQRScan.launch(intent)
+                        }
+                    }
+                }
             }
         }
     }
@@ -349,31 +369,17 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
         val statusbarNonColored = CurrentTheme.getStatusBarNonColored(this)
         val statusbarColored = CurrentTheme.getStatusBarColor(this)
         val w = window
-        w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-        w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         w.statusBarColor = if (colored) statusbarColored else statusbarNonColored
         @ColorInt val navigationColor =
             if (colored) CurrentTheme.getNavigationBarColor(this) else Color.BLACK
         w.navigationBarColor = navigationColor
-        if (Utils.hasMarshmallow()) {
-            var flags = window.decorView.systemUiVisibility
-            flags = if (invertIcons) {
-                flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-            } else {
-                flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-            }
-            window.decorView.systemUiVisibility = flags
-        }
-        if (Utils.hasOreo()) {
-            var flags = window.decorView.systemUiVisibility
-            if (invertIcons) {
-                flags = flags or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-                w.decorView.systemUiVisibility = flags
-                w.navigationBarColor = Color.WHITE
-            } else {
-                flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
-                w.decorView.systemUiVisibility = flags
-            }
+        val ins = WindowInsetsControllerCompat(w, w.decorView)
+        ins.isAppearanceLightStatusBars = invertIcons
+        ins.isAppearanceLightNavigationBars = invertIcons
+
+        if (!Utils.hasMarshmallow()) {
+            w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+            w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         }
     }
 
@@ -394,6 +400,7 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
                 requestReadWritePermission.launch()
                 return
             }
+            AppPerms.ignoreBattery(this)
             if (Intent.ACTION_GET_CONTENT.contentEquals(action, true)) {
                 isSelected = true
                 openNavigationPage(
@@ -501,30 +508,29 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
     }
 
     private fun bindToAudioPlayService() {
-        if (!isActivityDestroyed() && mAudioPlayServiceToken == null) {
+        if (mAudioPlayServiceToken == null) {
             mAudioPlayServiceToken = MusicPlaybackController.bindToServiceWithoutStart(this, this)
         }
     }
 
     override fun onDestroy() {
         mCompositeDisposable.dispose()
-        mDestroyed = true
         supportFragmentManager.removeOnBackStackChangedListener(mOnBackStackChangedListener)
 
-        //if(!bNoDestroyServiceAudio)
-        unbindFromAudioPlayService()
+        if (!isChangingConfigurations) {
+            unbindFromAudioPlayService()
+        }
         super.onDestroy()
     }
 
     private fun unbindFromAudioPlayService() {
         if (mAudioPlayServiceToken != null) {
+            if (isChangingConfigurations) {
+                MusicPlaybackController.doNotDestroyWhenActivityRecreated()
+            }
             MusicPlaybackController.unbindFromService(mAudioPlayServiceToken)
             mAudioPlayServiceToken = null
         }
-    }
-
-    private fun isActivityDestroyed(): Boolean {
-        return mDestroyed
     }
 
     private fun clearBackStack() {
@@ -558,7 +564,7 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
             }
 
             SectionItem.LOCAL_SERVER -> {
-                if (!Settings.get().main().getLocalServer().enabled) {
+                if (!Settings.get().main().localServer.enabled) {
                     createCustomToast(this, mViewFragment, mBottomNavigation)
                         ?.setDuration(Toast.LENGTH_SHORT)
                         ?.showToastError(R.string.local_server_need_enable)
@@ -632,7 +638,7 @@ class MainActivity : AppCompatActivity(), OnSectionResumeCallback, AppStyleable,
     }
 
     override fun onServiceDisconnected(name: ComponentName?) {
-        if (isActivityDestroyed()) return
+        if (mAudioPlayServiceToken == null) return
 
         if (name?.className.equals(MusicPlaybackService::class.java.name)) {
             Logger.d(TAG, "Disconnected from MusicPlaybackService")

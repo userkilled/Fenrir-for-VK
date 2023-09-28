@@ -92,7 +92,15 @@ namespace TagLib {
     class TAGLIB_EXPORT FileTypeResolver
     {
     public:
-        virtual ~FileTypeResolver() = default;
+      FileTypeResolver();
+      /*!
+       * Destroys this FileTypeResolver instance.
+       */
+      virtual ~FileTypeResolver() = 0;
+
+      FileTypeResolver(const FileTypeResolver &) = delete;
+      FileTypeResolver &operator=(const FileTypeResolver &) = delete;
+
       /*!
        * This method must be overridden to provide an additional file type
        * resolver.  If the resolver is able to determine the file type it should
@@ -106,16 +114,30 @@ namespace TagLib {
                                bool readAudioProperties = true,
                                AudioProperties::ReadStyle
                                audioPropertiesStyle = AudioProperties::Average) const = 0;
+    private:
+      class FileTypeResolverPrivate;
+      std::unique_ptr<FileTypeResolverPrivate> d;
     };
 
     class TAGLIB_EXPORT StreamTypeResolver : public FileTypeResolver
     {
     public:
-        virtual ~StreamTypeResolver() = default;
+      StreamTypeResolver();
+      /*!
+       * Destroys this StreamTypeResolver instance.
+       */
+      ~StreamTypeResolver() override = 0;
+
+      StreamTypeResolver(const StreamTypeResolver &) = delete;
+      StreamTypeResolver &operator=(const StreamTypeResolver &) = delete;
+
       virtual File *createFileFromStream(IOStream *stream,
                                bool readAudioProperties = true,
                                AudioProperties::ReadStyle
                                audioPropertiesStyle = AudioProperties::Average) const = 0;
+    private:
+      class StreamTypeResolverPrivate;
+      std::unique_ptr<StreamTypeResolverPrivate> d;
     };
 
     /*!
@@ -280,6 +302,7 @@ namespace TagLib {
      *
      * \deprecated Use FileRef(FileName, bool, AudioProperties::ReadStyle).
      */
+     // Kept because it is used for the C bindings
     static File *create(FileName fileName,
                         bool readAudioProperties = true,
                         AudioProperties::ReadStyle audioPropertiesStyle = AudioProperties::Average);
@@ -289,7 +312,7 @@ namespace TagLib {
     void parse(IOStream *stream, bool readAudioProperties, AudioProperties::ReadStyle audioPropertiesStyle);
 
     class FileRefPrivate;
-    FileRefPrivate *d;
+    std::shared_ptr<FileRefPrivate> d;
   };
 
 } // namespace TagLib

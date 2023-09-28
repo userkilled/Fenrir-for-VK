@@ -26,8 +26,8 @@
 #ifndef TAGLIB_ID3V2EXTENDEDHEADER_H
 #define TAGLIB_ID3V2EXTENDEDHEADER_H
 
-#include "taglib_export.h"
 #include "tbytevector.h"
+#include "taglib_export.h"
 #include "taglib.h"
 
 namespace TagLib {
@@ -58,6 +58,9 @@ namespace TagLib {
        */
       virtual ~ExtendedHeader();
 
+      ExtendedHeader(const ExtendedHeader &) = delete;
+      ExtendedHeader &operator=(const ExtendedHeader &) = delete;
+
       /*!
        * Returns the size of the extended header.  This is variable for the
        * extended header.
@@ -81,11 +84,8 @@ namespace TagLib {
       void parse(const ByteVector &data);
 
     private:
-      ExtendedHeader(const ExtendedHeader &);
-      ExtendedHeader &operator=(const ExtendedHeader &);
-
       class ExtendedHeaderPrivate;
-      ExtendedHeaderPrivate *d;
+      std::unique_ptr<ExtendedHeaderPrivate> d;
     };
 
   }  // namespace ID3v2

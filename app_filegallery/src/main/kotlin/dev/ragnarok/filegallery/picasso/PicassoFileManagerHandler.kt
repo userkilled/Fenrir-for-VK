@@ -3,11 +3,15 @@ package dev.ragnarok.filegallery.picasso
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import android.graphics.Matrix
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.core.net.toFile
 import androidx.exifinterface.media.ExifInterface
+import com.squareup.picasso3.BitmapSafeResize
 import com.squareup.picasso3.BitmapUtils
 import com.squareup.picasso3.Picasso
 import com.squareup.picasso3.Request
@@ -20,9 +24,10 @@ import dev.ragnarok.filegallery.Includes
 import dev.ragnarok.filegallery.fragment.filemanager.FileManagerFragment.Companion.isExtension
 import dev.ragnarok.filegallery.settings.Settings
 import dev.ragnarok.filegallery.util.CoverSafeResize
-import dev.ragnarok.filegallery.util.Utils
+import okio.buffer
 import okio.source
 import java.io.*
+import java.nio.ByteBuffer
 
 class PicassoFileManagerHandler(val context: Context) : RequestHandler() {
     companion object {
@@ -60,14 +65,14 @@ class PicassoFileManagerHandler(val context: Context) : RequestHandler() {
         // Filters based on whether the file is hidden or not
         if (ret) {
             ret = false
-            for (i in Settings.get().main().photoExt()) {
+            for (i in Settings.get().main().photoExt) {
                 if (sel.extension.contains(i, true)) {
                     ret = true
                     break
                 }
             }
             if (!ret) {
-                for (i in Settings.get().main().audioExt()) {
+                for (i in Settings.get().main().audioExt) {
                     if (sel.extension.contains(i, true)) {
                         ret = true
                         break
@@ -75,7 +80,7 @@ class PicassoFileManagerHandler(val context: Context) : RequestHandler() {
                 }
             }
             if (!ret) {
-                for (i in Settings.get().main().videoExt()) {
+                for (i in Settings.get().main().videoExt) {
                     if (sel.extension.contains(i, true)) {
                         ret = true
                         break
@@ -99,6 +104,44 @@ class PicassoFileManagerHandler(val context: Context) : RequestHandler() {
             ExifInterface.ORIENTATION_ROTATE_270, ExifInterface.ORIENTATION_TRANSVERSE -> 270
             else -> 0
         }
+
+    private fun getExifTranslation(orientation: Int) =
+        when (orientation) {
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL, ExifInterface.ORIENTATION_FLIP_VERTICAL,
+            ExifInterface.ORIENTATION_TRANSPOSE, ExifInterface.ORIENTATION_TRANSVERSE -> -1
+
+            else -> 1
+        }
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    private fun decodeImageSource(imageSource: ImageDecoder.Source): Bitmap {
+        return ImageDecoder.decodeBitmap(imageSource) { imageDecoder, imageInfo, _ ->
+            imageDecoder.allocator = when {
+                BitmapSafeResize.isHardwareRendering() == 1 -> {
+                    imageDecoder.isMutableRequired = true
+                    ImageDecoder.ALLOCATOR_DEFAULT
+                }
+
+                BitmapSafeResize.isHardwareRendering() == 2 -> {
+                    imageDecoder.isMutableRequired = false
+                    ImageDecoder.ALLOCATOR_HARDWARE
+                }
+
+                else -> {
+                    imageDecoder.isMutableRequired = true
+                    ImageDecoder.ALLOCATOR_SOFTWARE
+                }
+            }
+            val resWidth = imageInfo.size.width
+            val resHeight = imageInfo.size.height
+            CoverSafeResize.checkSizeOfBitmapP(resWidth, resHeight, object :
+                CoverSafeResize.ResizeBitmap {
+                override fun doResize(resizedWidth: Int, resizedHeight: Int) {
+                    imageDecoder.setTargetSize(resizedWidth, resizedHeight)
+                }
+            })
+        }
+    }
 
     private fun work(requestUri: Uri, dir: File, request: Request, callback: Callback) {
         if (dir.exists()) {
@@ -124,7 +167,7 @@ class PicassoFileManagerHandler(val context: Context) : RequestHandler() {
             return
         }
         when {
-            isExtension(requestUri.toString(), Settings.get().main().audioExt()) -> {
+            isExtension(requestUri.toString(), Settings.get().main().audioExt) -> {
                 var target = getMetadataAudioThumbnail(requestUri)
                 if (target == null) {
                     dir.createNewFile()
@@ -134,7 +177,7 @@ class PicassoFileManagerHandler(val context: Context) : RequestHandler() {
                     target = CoverSafeResize.checkBitmap(target)
                     val fOutputStream = FileOutputStream(dir)
                     target.compress(
-                        if (Utils.hasR()) Bitmap.CompressFormat.WEBP_LOSSY else Bitmap.CompressFormat.JPEG,
+                        Bitmap.CompressFormat.JPEG,
                         95,
                         fOutputStream
                     )
@@ -148,7 +191,7 @@ class PicassoFileManagerHandler(val context: Context) : RequestHandler() {
 
             isExtension(
                 requestUri.toString(),
-                Settings.get().main().videoExt()
+                Settings.get().main().videoExt
             ) || requestUri.toString().endsWith("gif", true) -> {
                 var target =
                     if (FenrirNative.isNativeLoaded) AnimatedFileFrame.getThumbnail(requestUri.toFile().absoluteFile) else null
@@ -160,7 +203,7 @@ class PicassoFileManagerHandler(val context: Context) : RequestHandler() {
                     target = CoverSafeResize.checkBitmap(target)
                     val fOutputStream = FileOutputStream(dir)
                     target.compress(
-                        if (Utils.hasR()) Bitmap.CompressFormat.WEBP_LOSSY else Bitmap.CompressFormat.JPEG,
+                        Bitmap.CompressFormat.JPEG,
                         95,
                         fOutputStream
                     )
@@ -172,37 +215,66 @@ class PicassoFileManagerHandler(val context: Context) : RequestHandler() {
                 return
             }
 
-            isExtension(requestUri.toString(), Settings.get().main().photoExt()) -> {
+            isExtension(requestUri.toString(), Settings.get().main().photoExt) -> {
                 val s = getSource(requestUri)
                 var target: Bitmap
                 try {
-                    target = BitmapUtils.decodeStream(s.source(), request)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        val exceptionCatchingSource =
+                            BitmapUtils.ExceptionCatchingSource(s.source())
+                        val bufferedSource = exceptionCatchingSource.buffer()
+                        val imageSource =
+                            ImageDecoder.createSource(ByteBuffer.wrap(bufferedSource.readByteArray()))
+                        target = decodeImageSource(imageSource)
+                        exceptionCatchingSource.throwIfCaught()
+                    } else {
+                        target = CoverSafeResize.checkBitmap(
+                            BitmapUtils.decodeStream(
+                                s.source(),
+                                request
+                            )
+                        )
+                    }
                     s.close()
                 } catch (e: Exception) {
                     dir.createNewFile()
                     callback.onError(Throwable("Thumb work error"))
                     return
                 }
-                var exifOrientation = 0
-                try {
-                    exifOrientation = getExifRotation(getExifOrientation(requestUri))
-                } catch (e: Exception) {
-                    if (Constants.IS_DEBUG) {
-                        e.printStackTrace()
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+                    try {
+                        val exifOrientation = getExifOrientation(requestUri)
+                        val exifRotation = getExifRotation(exifOrientation)
+                        val exifTranslation = getExifTranslation(exifOrientation)
+                        if (exifRotation != 0 || exifTranslation != 1) {
+                            val matrix = Matrix()
+                            if (exifRotation != 0) {
+                                matrix.preRotate(exifRotation.toFloat())
+                            }
+                            if (exifTranslation != 1) {
+                                matrix.postScale(exifTranslation.toFloat(), 1f)
+                            }
+                            /*
+                            if (exifRotation == 90 || exifRotation == 270) {
+                                val tmpHeight = target.height
+                                target.height = target.width
+                                target.width = tmpHeight
+                            }
+                             */
+                            target = Bitmap.createBitmap(
+                                target, 0, 0,
+                                target.width, target.height, matrix, true
+                            )
+                        }
+                    } catch (e: Exception) {
+                        if (Constants.IS_DEBUG) {
+                            e.printStackTrace()
+                        }
                     }
-                }
-                target = CoverSafeResize.checkBitmap(target)
-                if (exifOrientation > 0) {
-                    val matrix = Matrix()
-                    matrix.postRotate(exifOrientation.toFloat())
-                    target = Bitmap.createBitmap(
-                        target, 0, 0,
-                        target.width, target.height, matrix, true
-                    )
                 }
                 val fOutputStream = FileOutputStream(dir)
                 target.compress(
-                    if (Utils.hasR()) Bitmap.CompressFormat.WEBP_LOSSY else Bitmap.CompressFormat.JPEG,
+                    Bitmap.CompressFormat.JPEG,
                     95,
                     fOutputStream
                 )

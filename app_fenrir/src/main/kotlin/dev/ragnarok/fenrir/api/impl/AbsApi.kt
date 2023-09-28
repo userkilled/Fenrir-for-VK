@@ -1,8 +1,12 @@
 package dev.ragnarok.fenrir.api.impl
 
 import android.os.SystemClock
-import dev.ragnarok.fenrir.*
-import dev.ragnarok.fenrir.api.*
+import dev.ragnarok.fenrir.Includes
+import dev.ragnarok.fenrir.api.AbsVKApiInterceptor
+import dev.ragnarok.fenrir.api.ApiException
+import dev.ragnarok.fenrir.api.IServiceProvider
+import dev.ragnarok.fenrir.api.OutOfDateException
+import dev.ragnarok.fenrir.api.TokenType
 import dev.ragnarok.fenrir.api.model.Captcha
 import dev.ragnarok.fenrir.api.model.Error
 import dev.ragnarok.fenrir.api.model.Params
@@ -11,10 +15,15 @@ import dev.ragnarok.fenrir.api.model.response.BaseResponse
 import dev.ragnarok.fenrir.api.model.response.VKResponse
 import dev.ragnarok.fenrir.api.rest.HttpException
 import dev.ragnarok.fenrir.api.rest.IServiceRest
+import dev.ragnarok.fenrir.isMsgPack
+import dev.ragnarok.fenrir.kJson
+import dev.ragnarok.fenrir.nonNullNoEmpty
+import dev.ragnarok.fenrir.nullOrEmpty
+import dev.ragnarok.fenrir.requireNonNull
 import dev.ragnarok.fenrir.service.ApiErrorCodes
 import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.util.refresh.RefreshToken
-import dev.ragnarok.fenrir.util.serializeble.json.decodeFromStream
+import dev.ragnarok.fenrir.util.serializeble.json.decodeFromBufferedSource
 import dev.ragnarok.fenrir.util.serializeble.msgpack.MsgPack
 import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.core.Single
@@ -22,7 +31,9 @@ import io.reactivex.rxjava3.core.SingleEmitter
 import io.reactivex.rxjava3.exceptions.Exceptions
 import io.reactivex.rxjava3.functions.Function
 import kotlinx.serialization.KSerializer
-import okhttp3.*
+import okhttp3.FormBody
+import okhttp3.Request
+import okhttp3.Response
 import kotlin.random.Random
 
 internal open class AbsApi(val accountId: Long, private val restProvider: IServiceProvider) {
@@ -71,8 +82,8 @@ internal open class AbsApi(val accountId: Long, private val restProvider: IServi
             .map { response ->
                 val k = if (response.body.isMsgPack()) MsgPack().decodeFromOkioStream(
                     serializerType, response.body.source()
-                ) as BaseResponse<T> else kJson.decodeFromStream(
-                    serializerType, response.body.byteStream()
+                ) as BaseResponse<T> else kJson.decodeFromBufferedSource(
+                    serializerType, response.body.source()
                 ) as BaseResponse<T>
                 k.error?.let {
                     it.serializer = serializerType
@@ -129,7 +140,7 @@ internal open class AbsApi(val accountId: Long, private val restProvider: IServi
                 if (it.body.isMsgPack()) MsgPack().decodeFromOkioStream(
                     VKResponse.serializer(),
                     it.body.source()
-                ) else kJson.decodeFromStream(VKResponse.serializer(), it.body.byteStream())
+                ) else kJson.decodeFromBufferedSource(VKResponse.serializer(), it.body.source())
             }
     }
 
@@ -198,7 +209,7 @@ internal open class AbsApi(val accountId: Long, private val restProvider: IServi
                         break
                     }
                 }
-                if (code != null) {
+                if (code.nonNullNoEmpty() && captcha.sid.nonNullNoEmpty()) {
                     params["captcha_sid"] = captcha.sid
                     params["captcha_key"] = code
                 }
@@ -222,7 +233,7 @@ internal open class AbsApi(val accountId: Long, private val restProvider: IServi
                     var method = it["post_url"]
                     if ("empty" == method) {
                         method = "https://" + Settings.get()
-                            .other().get_Api_Domain() + "/method/" + it["method"]
+                            .main().apiDomain + "/method/" + it["method"]
                     }
                     return@Function rawVKRequest<T>(
                         method,
@@ -233,6 +244,13 @@ internal open class AbsApi(val accountId: Long, private val restProvider: IServi
                         .blockingGet()
                 }
             }
+            /*
+            response.executeErrors.nonNullNoEmpty {
+                it[0].requireNonNull { sit ->
+                    throw Exceptions.propagate(ApiException(sit))
+                }
+            }
+             */
             response.response ?: throw NullPointerException("VK return null response")
         }
     }
@@ -247,13 +265,20 @@ internal open class AbsApi(val accountId: Long, private val restProvider: IServi
                     var method = it["post_url"]
                     if ("empty" == method) {
                         method = "https://" + Settings.get()
-                            .other().get_Api_Domain() + "/method/" + it["method"]
+                            .main().apiDomain + "/method/" + it["method"]
                     }
                     return@Function rawVKRequestOnly(method, params)
                         .map(checkResponseWithErrorHandling())
                         .blockingGet()
                 }
             }
+            /*
+            response.executeErrors.nonNullNoEmpty {
+                it[0].requireNonNull { sit ->
+                    throw Exceptions.propagate(ApiException(sit))
+                }
+            }
+             */
             Completable.complete()
         }
     }

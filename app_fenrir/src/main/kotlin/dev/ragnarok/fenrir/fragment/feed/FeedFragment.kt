@@ -138,7 +138,7 @@ class FeedFragment : PlaceSupportMvpFragment<FeedPresenter, IFeedView>(), IFeedV
         }
         mRecycleView = root.findViewById(R.id.fragment_feeds_list)
         mRecycleView?.layoutManager = mFeedLayoutManager
-        mRecycleView?.addOnScrollListener(PicassoPauseOnScrollListener(Constants.PICASSO_TAG))
+        PicassoPauseOnScrollListener.addListener(mRecycleView)
         mRecycleView?.addOnScrollListener(object : EndlessRecyclerOnScrollListener(4, 1000) {
             override fun onScrollToLastElement() {
                 presenter?.fireScrollToBottom()
@@ -197,7 +197,7 @@ class FeedFragment : PlaceSupportMvpFragment<FeedPresenter, IFeedView>(), IFeedV
         // восстанавливаем из настроек последнее значение next_from, данные до которого
         // хранятся в базе данных
         mNextFrom = Settings.get()
-                .other()
+                .main()
                 .restoreFeedNextFrom(getAccountId());
 
         // загружаем все новости, которые сохранены в базу данных текущего аккаунта

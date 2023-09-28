@@ -37,48 +37,51 @@ foreach (ffmpeg_lib avutil swresample avcodec avformat swscale)
 endforeach ()
 
 add_library(thorvg STATIC
-        thorvg/src/lib/sw_engine/tvgSwFill.cpp
-        thorvg/src/lib/sw_engine/tvgSwImage.cpp
-        thorvg/src/lib/sw_engine/tvgSwMath.cpp
-        thorvg/src/lib/sw_engine/tvgSwMemPool.cpp
-        thorvg/src/lib/sw_engine/tvgSwRaster.cpp
-        thorvg/src/lib/sw_engine/tvgSwRenderer.cpp
-        thorvg/src/lib/sw_engine/tvgSwRle.cpp
-        thorvg/src/lib/sw_engine/tvgSwShape.cpp
-        thorvg/src/lib/sw_engine/tvgSwStroke.cpp
-        thorvg/src/lib/tvgAccessor.cpp
-        thorvg/src/lib/tvgBezier.cpp
-        thorvg/src/lib/tvgCanvas.cpp
-        thorvg/src/lib/tvgFill.cpp
-        thorvg/src/lib/tvgGlCanvas.cpp
-        thorvg/src/lib/tvgInitializer.cpp
-        thorvg/src/lib/tvgLinearGradient.cpp
-        thorvg/src/lib/tvgLoader.cpp
-        thorvg/src/lib/tvgPaint.cpp
-        thorvg/src/lib/tvgPicture.cpp
-        thorvg/src/lib/tvgRadialGradient.cpp
-        thorvg/src/lib/tvgRender.cpp
-        thorvg/src/lib/tvgSaver.cpp
-        thorvg/src/lib/tvgScene.cpp
-        thorvg/src/lib/tvgShape.cpp
-        thorvg/src/lib/tvgSwCanvas.cpp
-        thorvg/src/lib/tvgTaskScheduler.cpp
+        thorvg/src/renderer/sw_engine/tvgSwFill.cpp
+        thorvg/src/renderer/sw_engine/tvgSwImage.cpp
+        thorvg/src/renderer/sw_engine/tvgSwMath.cpp
+        thorvg/src/renderer/sw_engine/tvgSwMemPool.cpp
+        thorvg/src/renderer/sw_engine/tvgSwRaster.cpp
+        thorvg/src/renderer/sw_engine/tvgSwRenderer.cpp
+        thorvg/src/renderer/sw_engine/tvgSwRle.cpp
+        thorvg/src/renderer/sw_engine/tvgSwShape.cpp
+        thorvg/src/renderer/sw_engine/tvgSwStroke.cpp
+        thorvg/src/renderer/tvgAccessor.cpp
+        thorvg/src/renderer/tvgAnimation.cpp
+        thorvg/src/renderer/tvgCanvas.cpp
+        thorvg/src/renderer/tvgFill.cpp
+        thorvg/src/renderer/tvgGlCanvas.cpp
+        thorvg/src/renderer/tvgInitializer.cpp
+        thorvg/src/renderer/tvgLoader.cpp
+        thorvg/src/renderer/tvgPaint.cpp
+        thorvg/src/renderer/tvgPicture.cpp
+        thorvg/src/renderer/tvgRender.cpp
+        thorvg/src/renderer/tvgSaver.cpp
+        thorvg/src/renderer/tvgScene.cpp
+        thorvg/src/renderer/tvgShape.cpp
+        thorvg/src/renderer/tvgSwCanvas.cpp
+        thorvg/src/renderer/tvgTaskScheduler.cpp
         thorvg/src/loaders/raw/tvgRawLoader.cpp
         thorvg/src/loaders/svg/tvgSvgCssStyle.cpp
         thorvg/src/loaders/svg/tvgSvgLoader.cpp
         thorvg/src/loaders/svg/tvgSvgPath.cpp
         thorvg/src/loaders/svg/tvgSvgSceneBuilder.cpp
         thorvg/src/loaders/svg/tvgSvgUtil.cpp
-        thorvg/src/loaders/svg/tvgXmlParser.cpp)
+        thorvg/src/loaders/svg/tvgXmlParser.cpp
+        thorvg/src/common/tvgBezier.cpp
+        thorvg/src/common/tvgCompressor.cpp
+        thorvg/src/common/tvgMath.cpp
+        thorvg/src/common/tvgStr.cpp)
 
 target_compile_options(thorvg PRIVATE
-        -fno-exceptions -ffast-math ${OPTIMIZE_NORMAL} -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables -Woverloaded-virtual -Wno-unused-parameter ${SYM_VISIBILITY})
+        -DTVG_STATIC=1 -fno-exceptions -ffast-math ${OPTIMIZE_NORMAL} -fno-rtti -fno-unwind-tables -fno-asynchronous-unwind-tables -Woverloaded-virtual -Wno-unused-parameter ${SYM_VISIBILITY})
 target_include_directories(thorvg PRIVATE
         thorvg/inc
-        thorvg/src/lib
-        thorvg/src/lib/sw_engine
+        thorvg/src/renderer
+        thorvg/src/renderer/sw_engine
         thorvg/src/loaders/raw
-        thorvg/src/loaders/svg)
+        thorvg/src/loaders/svg
+        thorvg/src/common)
 
 add_library(rlottie STATIC
         rlottie/src/lottie/lottieanimation.cpp
@@ -123,70 +126,58 @@ target_include_directories(rlottie PRIVATE
         rlottie/src/vector/stb)
 
 add_library(libyuv STATIC
+        animation/libyuv/source/compare.cc
         animation/libyuv/source/compare_common.cc
         animation/libyuv/source/compare_gcc.cc
+        animation/libyuv/source/compare_msa.cc
         animation/libyuv/source/compare_neon64.cc
-        animation/libyuv/source/compare_win.cc
-        animation/libyuv/source/compare.cc
+        animation/libyuv/source/compare_neon.cc
         animation/libyuv/source/convert_argb.cc
+        animation/libyuv/source/convert.cc
         animation/libyuv/source/convert_from_argb.cc
         animation/libyuv/source/convert_from.cc
         animation/libyuv/source/convert_jpeg.cc
         animation/libyuv/source/convert_to_argb.cc
         animation/libyuv/source/convert_to_i420.cc
-        animation/libyuv/source/convert.cc
         animation/libyuv/source/cpu_id.cc
         animation/libyuv/source/mjpeg_decoder.cc
         animation/libyuv/source/mjpeg_validate.cc
         animation/libyuv/source/planar_functions.cc
         animation/libyuv/source/rotate_any.cc
         animation/libyuv/source/rotate_argb.cc
-        animation/libyuv/source/rotate_lsx.cc
+        animation/libyuv/source/rotate.cc
         animation/libyuv/source/rotate_common.cc
         animation/libyuv/source/rotate_gcc.cc
+        animation/libyuv/source/rotate_lsx.cc
+        animation/libyuv/source/rotate_msa.cc
         animation/libyuv/source/rotate_neon64.cc
-        animation/libyuv/source/rotate_win.cc
-        animation/libyuv/source/rotate.cc
+        animation/libyuv/source/rotate_neon.cc
         animation/libyuv/source/row_any.cc
-        animation/libyuv/source/row_rvv.cc
-        animation/libyuv/source/row_lasx.cc
-        animation/libyuv/source/row_lsx.cc
         animation/libyuv/source/row_common.cc
         animation/libyuv/source/row_gcc.cc
+        animation/libyuv/source/row_lasx.cc
+        animation/libyuv/source/row_lsx.cc
+        animation/libyuv/source/row_msa.cc
         animation/libyuv/source/row_neon64.cc
-        animation/libyuv/source/row_win.cc
+        animation/libyuv/source/row_neon.cc
+        animation/libyuv/source/row_rvv.cc
         animation/libyuv/source/scale_any.cc
         animation/libyuv/source/scale_argb.cc
-        animation/libyuv/source/scale_common.cc
-        animation/libyuv/source/scale_lsx.cc
-        animation/libyuv/source/scale_gcc.cc
-        animation/libyuv/source/scale_neon64.cc
-        animation/libyuv/source/scale_win.cc
         animation/libyuv/source/scale.cc
-        animation/libyuv/source/video_common.cc
+        animation/libyuv/source/scale_common.cc
+        animation/libyuv/source/scale_gcc.cc
+        animation/libyuv/source/scale_lsx.cc
+        animation/libyuv/source/scale_msa.cc
+        animation/libyuv/source/scale_neon64.cc
+        animation/libyuv/source/scale_neon.cc
         animation/libyuv/source/scale_rgb.cc
-        animation/libyuv/source/scale_uv.cc)
+        animation/libyuv/source/scale_rvv.cc
+        animation/libyuv/source/scale_uv.cc
+        animation/libyuv/source/video_common.cc)
 target_compile_options(libyuv PRIVATE
         -ffast-math ${OPTIMIZE_NORMAL} -funroll-loops -fno-strict-aliasing -fno-math-errno ${SYM_VISIBILITY})
 target_include_directories(libyuv PRIVATE
         animation/libyuv/include)
-
-if (${ANDROID_ABI} STREQUAL "armeabi-v7a")
-    set_target_properties(libyuv PROPERTIES
-            ANDROID_ARM_NEON FALSE
-            ANDROID_ARM_MODE arm)
-    target_compile_definitions(libyuv PRIVATE
-            ANDROID_ARM_NEON=false)
-    target_sources(libyuv PRIVATE
-            animation/libyuv/source/compare_neon.cc
-            animation/libyuv/source/rotate_neon.cc
-            animation/libyuv/source/row_neon.cc
-            animation/libyuv/source/scale_neon.cc)
-else ()
-    set_target_properties(libyuv PROPERTIES
-            ANDROID_ARM_NEON FALSE
-            ANDROID_ARM_MODE arm)
-endif ()
 
 add_library(opus STATIC
         audio/opus/libopus/src/opus.c
@@ -404,7 +395,6 @@ add_library(common STATIC
         audio/taglib/toolkit/tfilestream.cpp
         audio/taglib/toolkit/tiostream.cpp
         audio/taglib/toolkit/tpropertymap.cpp
-        audio/taglib/toolkit/trefcounter.cpp
         audio/taglib/toolkit/tstring.cpp
         audio/taglib/toolkit/tstringlist.cpp
         audio/taglib/toolkit/tzlib.cpp

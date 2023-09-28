@@ -23,72 +23,70 @@
  *   http://www.mozilla.org/MPL/                                           *
  ***************************************************************************/
 
-#include <tagunion.h>
-#include <tstringlist.h>
-#include <tpropertymap.h>
+#include "tagunion.h"
 
-#include "id3v1tag.h"
-#include "id3v2tag.h"
-#include "apetag.h"
+#include <array>
+
+#include "tstringlist.h"
+#include "tpropertymap.h"
 
 using namespace TagLib;
 
-#define stringUnion(method)                                          \
-  if(tag(0) && !tag(0)->method().isEmpty())                          \
-    return tag(0)->method();                                         \
-  if(tag(1) && !tag(1)->method().isEmpty())                          \
-    return tag(1)->method();                                         \
-  if(tag(2) && !tag(2)->method().isEmpty())                          \
-    return tag(2)->method();                                         \
-  return String();                                                   \
+#define stringUnion(method)                                               \
+  do {                                                                    \
+    if(tag(0) && !tag(0)->method().isEmpty())                             \
+      return tag(0)->method();                                            \
+    if(tag(1) && !tag(1)->method().isEmpty())                             \
+      return tag(1)->method();                                            \
+    if(tag(2) && !tag(2)->method().isEmpty())                             \
+      return tag(2)->method();                                            \
+    return String();                                                      \
+  } while(0)
 
-#define numberUnion(method)                                          \
-  if(tag(0) && tag(0)->method() > 0)                                 \
-    return tag(0)->method();                                         \
-  if(tag(1) && tag(1)->method() > 0)                                 \
-    return tag(1)->method();                                         \
-  if(tag(2) && tag(2)->method() > 0)                                 \
-    return tag(2)->method();                                         \
-  return 0
+#define numberUnion(method)                                               \
+  do {                                                                    \
+    if(tag(0) && tag(0)->method() > 0)                                    \
+      return tag(0)->method();                                            \
+    if(tag(1) && tag(1)->method() > 0)                                    \
+      return tag(1)->method();                                            \
+    if(tag(2) && tag(2)->method() > 0)                                    \
+      return tag(2)->method();                                            \
+    return 0;                                                             \
+  } while(0)
 
-#define setUnion(method, value)                                      \
-  if(tag(0))                                                         \
-    tag(0)->set##method(value);                                      \
-  if(tag(1))                                                         \
-    tag(1)->set##method(value);                                      \
-  if(tag(2))                                                         \
-    tag(2)->set##method(value);                                      \
+#define setUnion(method, value)                                           \
+  do {                                                                    \
+    if(tag(0))                                                            \
+      tag(0)->set##method(value);                                         \
+    if(tag(1))                                                            \
+      tag(1)->set##method(value);                                         \
+    if(tag(2))                                                            \
+      tag(2)->set##method(value);                                         \
+  } while(0)
 
 class TagUnion::TagUnionPrivate
 {
 public:
-  TagUnionPrivate() : tags(3, static_cast<Tag *>(0))
-  {
-
-  }
-
+  TagUnionPrivate() = default;
   ~TagUnionPrivate()
   {
-    delete tags[0];
-    delete tags[1];
-    delete tags[2];
+    for(auto &tag : tags)
+      delete tag;
   }
 
-  std::vector<Tag *> tags;
+  TagUnionPrivate(const TagUnionPrivate &) = delete;
+  TagUnionPrivate &operator=(const TagUnionPrivate &) = delete;
+
+  std::array<Tag *, 3> tags { nullptr, nullptr, nullptr };
 };
 
 TagUnion::TagUnion(Tag *first, Tag *second, Tag *third) :
-  d(new TagUnionPrivate())
+  d(std::make_unique<TagUnionPrivate>())
 {
-  d->tags[0] = first;
-  d->tags[1] = second;
-  d->tags[2] = third;
+  d->tags = { first, second, third };
 }
 
-TagUnion::~TagUnion()
-{
-  delete d;
-}
+TagUnion::~TagUnion() = default;
 
 Tag *TagUnion::operator[](int index) const
 {
@@ -108,21 +106,9 @@ void TagUnion::set(int index, Tag *tag)
 
 PropertyMap TagUnion::properties() const
 {
-  // This is an ugly workaround but we can't add a virtual function.
-  // Should be virtual in taglib2.
-
-  for(size_t i = 0; i < 3; ++i) {
-
-    if(d->tags[i] && !d->tags[i]->isEmpty()) {
-
-      if(dynamic_cast<const ID3v1::Tag *>(d->tags[i]))
-        return dynamic_cast<const ID3v1::Tag *>(d->tags[i])->properties();
-
-      if(dynamic_cast<const ID3v2::Tag *>(d->tags[i]))
-        return dynamic_cast<const ID3v2::Tag *>(d->tags[i])->properties();
-
-      if(dynamic_cast<const APE::Tag *>(d->tags[i]))
-        return dynamic_cast<const APE::Tag *>(d->tags[i])->properties();
+  for(const auto &tag : d->tags) {
+    if(tag && !tag->isEmpty()) {
+      return tag->properties();
     }
   }
 
@@ -131,21 +117,9 @@ PropertyMap TagUnion::properties() const
 
 void TagUnion::removeUnsupportedProperties(const StringList &unsupported)
 {
-  // This is an ugly workaround but we can't add a virtual function.
-  // Should be virtual in taglib2.
-
-  for(size_t i = 0; i < 3; ++i) {
-
-    if(d->tags[i]) {
-
-      if(dynamic_cast<ID3v1::Tag *>(d->tags[i]))
-        dynamic_cast<ID3v1::Tag *>(d->tags[i])->removeUnsupportedProperties(unsupported);
-
-      else if(dynamic_cast<ID3v2::Tag *>(d->tags[i]))
-        dynamic_cast<ID3v2::Tag *>(d->tags[i])->removeUnsupportedProperties(unsupported);
-
-      else if(dynamic_cast<APE::Tag *>(d->tags[i]))
-        dynamic_cast<APE::Tag *>(d->tags[i])->removeUnsupportedProperties(unsupported);
+  for(const auto &tag : d->tags) {
+    if(tag) {
+      tag->removeUnsupportedProperties(unsupported);
     }
   }
 }
@@ -222,13 +196,5 @@ void TagUnion::setTrack(unsigned int i)
 
 bool TagUnion::isEmpty() const
 {
-  if(d->tags[0] && !d->tags[0]->isEmpty())
-    return false;
-  if(d->tags[1] && !d->tags[1]->isEmpty())
-    return false;
-  if(d->tags[2] && !d->tags[2]->isEmpty())
-    return false;
-
-  return true;
+  return std::none_of(d->tags.begin(), d->tags.end(), [](auto t) { return t && !t->isEmpty(); });
 }
-

@@ -23,13 +23,15 @@
  *   http://www.mozilla.org/MPL/                                           *
  ***************************************************************************/
 
-#include <tbytevectorlist.h>
-#include <id3v2tag.h>
-#include <tdebug.h>
-#include <tstringlist.h>
-
 #include "commentsframe.h"
+
+#include <utility>
+
+#include "tbytevectorlist.h"
+#include "tdebug.h"
+#include "tstringlist.h"
 #include "tpropertymap.h"
+#include "id3v2tag.h"
 
 using namespace TagLib;
 using namespace ID3v2;
@@ -37,8 +39,7 @@ using namespace ID3v2;
 class CommentsFrame::CommentsFramePrivate
 {
 public:
-  CommentsFramePrivate() : textEncoding(String::Latin1) {}
-  String::Type textEncoding;
+  String::Type textEncoding { String::Latin1 };
   ByteVector language;
   String description;
   String text;
@@ -50,22 +51,19 @@ public:
 
 CommentsFrame::CommentsFrame(String::Type encoding) :
   Frame("COMM"),
-  d(new CommentsFramePrivate())
+  d(std::make_unique<CommentsFramePrivate>())
 {
   d->textEncoding = encoding;
 }
 
 CommentsFrame::CommentsFrame(const ByteVector &data) :
   Frame(data),
-  d(new CommentsFramePrivate())
+  d(std::make_unique<CommentsFramePrivate>())
 {
   setData(data);
 }
 
-CommentsFrame::~CommentsFrame()
-{
-  delete d;
-}
+CommentsFrame::~CommentsFrame() = default;
 
 String CommentsFrame::toString() const
 {
@@ -125,18 +123,13 @@ PropertyMap CommentsFrame::asProperties() const
 
 CommentsFrame *CommentsFrame::findByDescription(const ID3v2::Tag *tag, const String &d) // static
 {
-  ID3v2::FrameList comments = tag->frameList("COMM");
-
-  for(ID3v2::FrameList::ConstIterator it = comments.begin();
-      it != comments.end();
-      ++it)
-  {
-    CommentsFrame *frame = dynamic_cast<CommentsFrame *>(*it);
+  for(const auto &comment : std::as_const(tag->frameList("COMM"))) {
+    auto frame = dynamic_cast<CommentsFrame *>(comment);
     if(frame && frame->description() == d)
       return frame;
   }
 
-  return 0;
+  return nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -192,7 +185,7 @@ ByteVector CommentsFrame::renderFields() const
 
 CommentsFrame::CommentsFrame(const ByteVector &data, Header *h) :
   Frame(h),
-  d(new CommentsFramePrivate())
+  d(std::make_unique<CommentsFramePrivate>())
 {
   parseFields(fieldData(data));
 }

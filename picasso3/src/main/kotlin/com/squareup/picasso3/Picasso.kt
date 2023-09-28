@@ -22,16 +22,12 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.os.Message
 import android.widget.ImageView
 import android.widget.RemoteViews
 import androidx.annotation.DrawableRes
 import androidx.annotation.IdRes
 import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.Lifecycle.Event.*
 import androidx.lifecycle.LifecycleOwner
-import com.squareup.picasso3.Dispatcher.Companion.HUNTER_COMPLETE
-import com.squareup.picasso3.Dispatcher.Companion.REQUEST_BATCH_RESUME
 import com.squareup.picasso3.MemoryPolicy.Companion.shouldReadFromMemoryCache
 import com.squareup.picasso3.Picasso.LoadedFrom.MEMORY
 import com.squareup.picasso3.RemoteViewsAction.RemoteViewsTarget
@@ -45,17 +41,19 @@ import com.squareup.picasso3.Utils.calculateMemoryCacheSize
 import com.squareup.picasso3.Utils.checkMain
 import com.squareup.picasso3.Utils.createDefaultCacheDir
 import com.squareup.picasso3.Utils.log
+import kotlinx.coroutines.Dispatchers
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import java.io.File
 import java.io.IOException
 import java.util.WeakHashMap
 import java.util.concurrent.ExecutorService
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Image downloading, transformation, and caching manager.
  *
- * Use [PicassoProvider.get] for a global singleton instance
+ * Use PicassoProvider.get for a global singleton instance
  * or construct your own instance with [Picasso.Builder].
  */
 class Picasso internal constructor(
@@ -119,6 +117,12 @@ class Picasso internal constructor(
     }
 
     override fun onDestroy(owner: LifecycleOwner) {
+        super.onDestroy(owner)
+        cancelAll()
+    }
+
+    @JvmName("-cancelAll")
+    internal fun cancelAll() {
         checkMain()
 
         val actions = targetToAction.values.toList()
@@ -187,6 +191,12 @@ class Picasso internal constructor(
     }
 
     override fun onStop(owner: LifecycleOwner) {
+        super.onStop(owner)
+        pauseAll()
+    }
+
+    @JvmName("-pauseAll")
+    internal fun pauseAll() {
         checkMain()
 
         val actions = targetToAction.values.toList()
@@ -214,7 +224,12 @@ class Picasso internal constructor(
         dispatcher.dispatchPauseTag(tag)
     }
 
-    override fun onResume(owner: LifecycleOwner) {
+    override fun onStart(owner: LifecycleOwner) {
+        resumeAll()
+    }
+
+    @JvmName("-resumeAll")
+    internal fun resumeAll() {
         checkMain()
 
         val actions = targetToAction.values.toList()
@@ -530,6 +545,8 @@ class Picasso internal constructor(
         private val context: Context
         private var callFactory: OkHttpClient? = null
         private var service: ExecutorService? = null
+        private var mainContext: CoroutineContext? = null
+        private var backgroundContext: CoroutineContext? = null
         private var cache: PlatformLruCache? = null
         private var listener: Listener? = null
         private val requestTransformers = mutableListOf<RequestTransformer>()
@@ -547,7 +564,10 @@ class Picasso internal constructor(
         internal constructor(picasso: Picasso) {
             context = picasso.context
             callFactory = picasso.callFactory
-            service = picasso.dispatcher.service
+            service = (picasso.dispatcher as? HandlerDispatcher)?.service
+            mainContext = (picasso.dispatcher as? InternalCoroutineDispatcher)?.mainContext
+            backgroundContext =
+                (picasso.dispatcher as? InternalCoroutineDispatcher)?.backgroundContext
             cache = picasso.cache
             listener = picasso.listener
             requestTransformers += picasso.requestTransformers
@@ -630,6 +650,17 @@ class Picasso internal constructor(
             loggingEnabled = enabled
         }
 
+        /**
+         * Sets the CoroutineDispatchers used internally
+         */
+        fun dispatchers(
+            mainContext: CoroutineContext = Dispatchers.Main,
+            backgroundContext: CoroutineContext = Dispatchers.IO
+        ) = apply {
+            this.mainContext = mainContext
+            this.backgroundContext = backgroundContext
+        }
+
         /** Create the [Picasso] instance. */
         fun build(): Picasso {
             var unsharedCache: Cache? = null
@@ -644,11 +675,21 @@ class Picasso internal constructor(
             if (cache == null) {
                 cache = PlatformLruCache(calculateMemoryCacheSize(context))
             }
-            if (service == null) {
-                service = PicassoExecutorService()
-            }
+            val dispatcher = if (backgroundContext != null) {
+                InternalCoroutineDispatcher(
+                    context,
+                    HANDLER,
+                    cache!!,
+                    mainContext!!,
+                    backgroundContext!!
+                )
+            } else {
+                if (service == null) {
+                    service = PicassoExecutorService()
+                }
 
-            val dispatcher = Dispatcher(context, service!!, HANDLER, cache!!)
+                HandlerDispatcher(context, service!!, HANDLER, cache!!)
+            }
 
             return Picasso(
                 context, dispatcher, callFactory!!, unsharedCache, cache!!, listener,
@@ -774,26 +815,7 @@ class Picasso internal constructor(
 
     internal companion object {
         @get:JvmName("-handler")
-        internal val HANDLER: Handler = object : Handler(Looper.getMainLooper()) {
-            override fun handleMessage(msg: Message) {
-                when (msg.what) {
-                    HUNTER_COMPLETE -> {
-                        val hunter = msg.obj as BitmapHunter
-                        hunter.picasso.complete(hunter)
-                    }
-
-                    REQUEST_BATCH_RESUME -> {
-                        val batch = msg.obj as List<*>
-                        for (i in batch.indices) {
-                            val action = batch[i] as Action
-                            action.picasso.resumeAction(action)
-                        }
-                    }
-
-                    else -> throw AssertionError("Unknown handler message received: " + msg.what)
-                }
-            }
-        }
+        internal val HANDLER = Handler(Looper.getMainLooper())
     }
 }
 

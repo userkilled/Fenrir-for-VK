@@ -2,10 +2,19 @@ package dev.ragnarok.fenrir.fragment.accounts
 
 import android.Manifest
 import android.app.Activity.RESULT_OK
-import android.content.*
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.DialogInterface
+import android.content.Intent
 import android.os.Bundle
 import android.os.Environment
-import android.view.*
+import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.activity.result.ActivityResult
@@ -21,8 +30,12 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
-import dev.ragnarok.fenrir.*
+import dev.ragnarok.fenrir.AccountType
+import dev.ragnarok.fenrir.Constants
 import dev.ragnarok.fenrir.Constants.DEFAULT_ACCOUNT_TYPE
+import dev.ragnarok.fenrir.Extra
+import dev.ragnarok.fenrir.Includes
+import dev.ragnarok.fenrir.R
 import dev.ragnarok.fenrir.activity.ActivityUtils.supportToolbarFor
 import dev.ragnarok.fenrir.activity.EnterPinActivity
 import dev.ragnarok.fenrir.activity.FileManagerSelectActivity
@@ -33,10 +46,11 @@ import dev.ragnarok.fenrir.dialog.directauth.DirectAuthDialog
 import dev.ragnarok.fenrir.dialog.directauth.DirectAuthDialog.Companion.newInstance
 import dev.ragnarok.fenrir.fragment.base.BaseMvpFragment
 import dev.ragnarok.fenrir.fragment.base.core.IPresenterFactory
+import dev.ragnarok.fenrir.kJson
 import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.ModalBottomSheetDialogFragment
-import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.Option
 import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.OptionRequest
-import dev.ragnarok.fenrir.model.*
+import dev.ragnarok.fenrir.model.Account
+import dev.ragnarok.fenrir.model.SaveAccount
 import dev.ragnarok.fenrir.place.PlaceFactory.getPreferencesPlace
 import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.util.AppPerms.hasReadStoragePermission
@@ -46,10 +60,8 @@ import dev.ragnarok.fenrir.util.MessagesReplyItemCallback
 import dev.ragnarok.fenrir.util.Utils
 import dev.ragnarok.fenrir.util.Utils.isHiddenAccount
 import dev.ragnarok.fenrir.util.ViewUtils.setupSwipeRefreshLayoutWithCurrentTheme
-import dev.ragnarok.fenrir.util.serializeble.json.*
 import dev.ragnarok.fenrir.util.toast.CustomSnackbars
 import dev.ragnarok.fenrir.util.toast.CustomToast.Companion.createCustomToast
-import okhttp3.*
 
 class AccountsFragment : BaseMvpFragment<AccountsPresenter, IAccountsView>(), IAccountsView,
     View.OnClickListener, AccountAdapter.Callback,
@@ -486,66 +498,64 @@ class AccountsFragment : BaseMvpFragment<AccountsPresenter, IAccountsView>(), IA
         )
         menus.show(
             childFragmentManager,
-            "account_options",
-            object : ModalBottomSheetDialogFragment.Listener {
-                override fun onModalOptionSelected(option: Option) {
-                    when (option.id) {
-                        0 -> presenter?.fireDelete(requireActivity(), account)
-                        1 -> presenter?.createShortcut(requireActivity(), account)
-                        2 -> presenter?.fireSetAsActive(account)
-                        3 -> if (!Settings.get().security().isUsePinForSecurity) {
+            "account_options"
+        ) { _, option ->
+            when (option.id) {
+                0 -> presenter?.fireDelete(requireActivity(), account)
+                1 -> presenter?.createShortcut(requireActivity(), account)
+                2 -> presenter?.fireSetAsActive(account)
+                3 -> if (!Settings.get().security().isUsePinForSecurity) {
+                    createCustomToast(requireActivity()).showToastError(R.string.not_supported_hide)
+                } else {
+                    presenter?.fireSetTempAccount(account.getOwnerObjectId())
+                    requestEnterPinForShowPassword.launch(
+                        Intent(
+                            requireActivity(),
+                            EnterPinActivity::class.java
+                        )
+                    )
+                }
+
+                4 -> {
+                    val root =
+                        View.inflate(requireActivity(), R.layout.dialog_enter_text, null)
+                    (root.findViewById<View>(R.id.editText) as TextInputEditText).setText(
+                        Settings.get().accounts().getDevice(account.getOwnerObjectId())
+                    )
+                    MaterialAlertDialogBuilder(requireActivity())
+                        .setTitle(R.string.set_device)
+                        .setCancelable(true)
+                        .setView(root)
+                        .setPositiveButton(R.string.button_ok) { _: DialogInterface?, _: Int ->
+                            Settings.get().accounts().storeDevice(
+                                account.getOwnerObjectId(),
+                                (root.findViewById<View>(R.id.editText) as TextInputEditText).editableText.toString()
+                            )
+                            Includes.proxySettings.broadcastUpdate(null)
+                        }
+                        .setNegativeButton(R.string.button_cancel, null)
+                        .show()
+                }
+
+                5 -> {
+                    presenter?.fireSetTempAccount(account.getOwnerObjectId())
+                    if (!hasReadWriteStoragePermission(requireActivity())) {
+                        requestWritePermissionExchangeToken.launch()
+                    } else {
+                        if (!Settings.get().security().isUsePinForSecurity) {
                             createCustomToast(requireActivity()).showToastError(R.string.not_supported_hide)
                         } else {
-                            presenter?.fireSetTempAccount(account.getOwnerObjectId())
-                            requestEnterPinForShowPassword.launch(
+                            requestEnterPinForExchangeToken.launch(
                                 Intent(
                                     requireActivity(),
                                     EnterPinActivity::class.java
                                 )
                             )
                         }
-
-                        4 -> {
-                            val root =
-                                View.inflate(requireActivity(), R.layout.dialog_enter_text, null)
-                            (root.findViewById<View>(R.id.editText) as TextInputEditText).setText(
-                                Settings.get().accounts().getDevice(account.getOwnerObjectId())
-                            )
-                            MaterialAlertDialogBuilder(requireActivity())
-                                .setTitle(R.string.set_device)
-                                .setCancelable(true)
-                                .setView(root)
-                                .setPositiveButton(R.string.button_ok) { _: DialogInterface?, _: Int ->
-                                    Settings.get().accounts().storeDevice(
-                                        account.getOwnerObjectId(),
-                                        (root.findViewById<View>(R.id.editText) as TextInputEditText).editableText.toString()
-                                    )
-                                    Includes.proxySettings.broadcastUpdate(null)
-                                }
-                                .setNegativeButton(R.string.button_cancel, null)
-                                .show()
-                        }
-
-                        5 -> {
-                            presenter?.fireSetTempAccount(account.getOwnerObjectId())
-                            if (!hasReadWriteStoragePermission(requireActivity())) {
-                                requestWritePermissionExchangeToken.launch()
-                            } else {
-                                if (!Settings.get().security().isUsePinForSecurity) {
-                                    createCustomToast(requireActivity()).showToastError(R.string.not_supported_hide)
-                                } else {
-                                    requestEnterPinForExchangeToken.launch(
-                                        Intent(
-                                            requireActivity(),
-                                            EnterPinActivity::class.java
-                                        )
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
-            })
+            }
+        }
     }
 
     @Suppress("DEPRECATION")

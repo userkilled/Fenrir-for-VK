@@ -15,6 +15,9 @@ import android.view.MotionEvent
 import android.view.View
 import androidx.camera.core.*
 import androidx.camera.core.Camera
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
@@ -136,7 +139,16 @@ class CameraScanActivity : NoMainActivity() {
         preview.setSurfaceProvider(textureView.surfaceProvider)
         val imageAnalysis = ImageAnalysis.Builder()
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-            .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+            .setResolutionSelector(
+                ResolutionSelector.Builder()
+                    .setResolutionStrategy(
+                        ResolutionStrategy(
+                            Size.parseSize("1200x1200"),
+                            ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER
+                        )
+                    ).setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+                    .build()
+            )
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
         imageAnalysis.setAnalyzer(
@@ -473,6 +485,11 @@ class CameraScanActivity : NoMainActivity() {
             val height = generatedQRCode.height
             val pixels = IntArray(width * height)
             generatedQRCode.getPixels(pixels, 0, width, 0, 0, width, height)
+            for (i in pixels.indices) {
+                if (Color.alpha(pixels[i]) < 90) {
+                    pixels[i] = Color.WHITE
+                }
+            }
             val source = RGBLuminanceSource(width, height, pixels)
             val binaryBitmap = BinaryBitmap(HybridBinarizer(source))
 

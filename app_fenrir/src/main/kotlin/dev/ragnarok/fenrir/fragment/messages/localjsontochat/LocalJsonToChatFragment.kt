@@ -13,7 +13,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import dev.ragnarok.fenrir.Constants
 import dev.ragnarok.fenrir.Extra
 import dev.ragnarok.fenrir.R
 import dev.ragnarok.fenrir.StubAnimatorListener
@@ -26,15 +25,16 @@ import dev.ragnarok.fenrir.fragment.messages.chat.MessagesAdapter.OnMessageActio
 import dev.ragnarok.fenrir.fromIOToMain
 import dev.ragnarok.fenrir.listener.PicassoPauseOnScrollListener
 import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.ModalBottomSheetDialogFragment
-import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.Option
 import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.OptionRequest
 import dev.ragnarok.fenrir.model.Keyboard
+import dev.ragnarok.fenrir.model.LastReadId
 import dev.ragnarok.fenrir.model.Message
 import dev.ragnarok.fenrir.model.Peer
 import dev.ragnarok.fenrir.nonNullNoEmpty
 import dev.ragnarok.fenrir.picasso.PicassoInstance
 import dev.ragnarok.fenrir.picasso.transforms.RoundTransformation
 import dev.ragnarok.fenrir.settings.CurrentTheme
+import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.util.Utils
 import dev.ragnarok.fenrir.util.rxutils.RxUtils
 import dev.ragnarok.fenrir.view.natives.rlottie.RLottieImageView
@@ -79,12 +79,19 @@ class LocalJsonToChatFragment :
         Avatar = root.findViewById(R.id.toolbar_avatar)
         EmptyAvatar = root.findViewById(R.id.empty_avatar_text)
 
-        recyclerView = root.findViewById(android.R.id.list)
+        recyclerView = root.findViewById(R.id.content_list)
         recyclerView?.layoutManager =
             LinearLayoutManager(requireActivity(), RecyclerView.VERTICAL, true)
-        recyclerView?.addOnScrollListener(PicassoPauseOnScrollListener(Constants.PICASSO_TAG))
+        PicassoPauseOnScrollListener.addListener(recyclerView)
         mLoadingProgressBar = root.findViewById(R.id.loading_progress_bar)
-        mAdapter = MessagesAdapter(requireActivity(), mutableListOf(), this, true)
+        mAdapter = MessagesAdapter(
+            Settings.get().accounts().current,
+            requireActivity(),
+            mutableListOf(),
+            LastReadId(0, 0),
+            this,
+            true
+        )
         recyclerView?.adapter = mAdapter
         return root
     }
@@ -188,13 +195,10 @@ class LocalJsonToChatFragment :
             )
         )
 
-        menus.show(childFragmentManager, "json_attachments_select",
-            object : ModalBottomSheetDialogFragment.Listener {
-                override fun onModalOptionSelected(option: Option) {
-                    presenter?.uAttachmentType = option.id
-                    presenter?.updateMessages(false)
-                }
-            })
+        menus.show(childFragmentManager, "json_attachments_select") { _, option ->
+            presenter?.uAttachmentType = option.id
+            presenter?.updateMessages(false)
+        }
     }
 
     override fun scroll_pos(pos: Int) {
@@ -333,7 +337,9 @@ class LocalJsonToChatFragment :
         presenter?.fireOwnerClick(userId)
     }
 
-    override fun onLongAvatarClick(message: Message, userId: Long, position: Int) {}
+    override fun onLongAvatarClick(message: Message, userId: Long, position: Int) {
+    }
+
     override fun onRestoreClick(message: Message, position: Int) {}
     override fun onBotKeyboardClick(button: Keyboard.Button) {}
 
@@ -341,7 +347,7 @@ class LocalJsonToChatFragment :
         return false
     }
 
-    override fun onMessageClicked(message: Message, position: Int) {}
+    override fun onMessageClicked(message: Message, position: Int, x: Int, y: Int) {}
     override fun onMessageDelete(message: Message) {}
 
     companion object {

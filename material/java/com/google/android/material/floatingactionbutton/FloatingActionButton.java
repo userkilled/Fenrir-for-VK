@@ -97,6 +97,11 @@ import java.util.List;
  * <p>The background color of this view defaults to the your theme's {@code colorSecondary}. If you
  * wish to change this at runtime then you can do so via {@link
  * #setBackgroundTintList(ColorStateList)}.
+ *
+ * <p>For more information, see the <a
+ * href="https://github.com/material-components/material-components-android/blob/master/docs/components/FloatingActionButton.md">component
+ * developer guidance</a> and <a
+ * href="https://material.io/components/floating-action-button/overview">design guidelines</a>.
  */
 public class FloatingActionButton extends VisibilityAwareImageButton
     implements TintableBackgroundView,
@@ -900,6 +905,12 @@ public class FloatingActionButton extends VisibilityAwareImageButton
     offsetRectWithShadow(rect);
   }
 
+  private void getTouchTargetRect(@NonNull Rect rect) {
+    getMeasuredContentRect(rect);
+    int touchTargetPadding = impl.getTouchTargetPadding();
+    rect.inset(-touchTargetPadding, -touchTargetPadding);
+  }
+
   private void offsetRectWithShadow(@NonNull Rect rect) {
     rect.left += shadowPadding.left;
     rect.top += shadowPadding.top;
@@ -917,7 +928,8 @@ public class FloatingActionButton extends VisibilityAwareImageButton
   public boolean onTouchEvent(@NonNull MotionEvent ev) {
     if (ev.getAction() == MotionEvent.ACTION_DOWN) {
       // Skipping the gesture if it doesn't start in the FAB 'content' area
-      if (getContentRect(touchArea) && !touchArea.contains((int) ev.getX(), (int) ev.getY())) {
+      getTouchTargetRect(touchArea);
+      if (!touchArea.contains((int) ev.getX(), (int) ev.getY())) {
         return false;
       }
     }

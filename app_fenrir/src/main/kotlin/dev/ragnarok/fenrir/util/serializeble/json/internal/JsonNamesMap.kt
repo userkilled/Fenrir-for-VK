@@ -5,19 +5,27 @@
 
 package dev.ragnarok.fenrir.util.serializeble.json.internal
 
-import dev.ragnarok.fenrir.util.serializeble.json.*
-import kotlinx.serialization.*
-import kotlinx.serialization.descriptors.*
-import kotlinx.serialization.encoding.*
+import dev.ragnarok.fenrir.util.serializeble.json.Json
+import dev.ragnarok.fenrir.util.serializeble.json.JsonConfiguration
+import dev.ragnarok.fenrir.util.serializeble.json.JsonNames
+import dev.ragnarok.fenrir.util.serializeble.json.JsonNamingStrategy
+import dev.ragnarok.fenrir.util.serializeble.json.schemaCache
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.StructureKind
+import kotlinx.serialization.encoding.CompositeDecoder
 
 internal val JsonDeserializationNamesKey = DescriptorSchemaCache.Key<Map<String, Int>>()
 internal val JsonSerializationNamesKey = DescriptorSchemaCache.Key<Array<String>>()
 
 private fun SerialDescriptor.buildDeserializationNamesMap(json: Json): Map<String, Int> {
     fun MutableMap<String, Int>.putOrThrow(name: String, index: Int) {
+        val entity = if (kind == SerialKind.ENUM) "enum value" else "property"
         if (name in this) {
             throw JsonException(
-                "The suggested name '$name' for property ${getElementName(index)} is already one of the names for property " +
+                "The suggested name '$name' for $entity ${getElementName(index)} is already one of the names for $entity " +
                         "${getElementName(getValue(name))} in ${this@buildDeserializationNamesMap}"
             )
         }
@@ -26,13 +34,25 @@ private fun SerialDescriptor.buildDeserializationNamesMap(json: Json): Map<Strin
 
     val builder: MutableMap<String, Int> =
         mutableMapOf() // can be not concurrent because it is only read after creation and safely published to concurrent map
-    val strategy = namingStrategy(json)
+    val useLowercaseEnums = json.decodeCaseInsensitive(this)
+    val strategyForClasses = namingStrategy(json)
     for (i in 0 until elementsCount) {
         getElementAnnotations(i).filterIsInstance<JsonNames>()
             .singleOrNull()?.names?.forEach { name ->
-                builder.putOrThrow(name, i)
+                builder.putOrThrow(if (useLowercaseEnums) name.lowercase() else name, i)
             }
-        strategy?.let { builder.putOrThrow(it.serialNameForJson(this, i, getElementName(i)), i) }
+        val nameToPut = when {
+            // the branches do not intersect because useLowercase = true for enums only, and strategy != null for classes only.
+            useLowercaseEnums -> getElementName(i).lowercase()
+            strategyForClasses != null -> strategyForClasses.serialNameForJson(
+                this,
+                i,
+                getElementName(i)
+            )
+
+            else -> null
+        }
+        nameToPut?.let { builder.putOrThrow(it, i) }
     }
     return builder.ifEmpty { emptyMap() }
 }
@@ -69,17 +89,24 @@ internal fun SerialDescriptor.getJsonElementName(json: Json, index: Int): String
 internal fun SerialDescriptor.namingStrategy(json: Json) =
     if (kind == StructureKind.CLASS) json.configuration.namingStrategy else null
 
+private fun SerialDescriptor.getJsonNameIndexSlowPath(json: Json, name: String): Int =
+    json.deserializationNamesMap(this)[name] ?: CompositeDecoder.UNKNOWN_NAME
+
+private fun Json.decodeCaseInsensitive(descriptor: SerialDescriptor) =
+    configuration.decodeEnumsCaseInsensitive && descriptor.kind == SerialKind.ENUM
+
 /**
- * Serves same purpose as [SerialDescriptor.getElementIndex] but respects
- * [JsonNames] annotation and [JsonConfiguration.useAlternativeNames] state.
+ * Serves same purpose as [SerialDescriptor.getElementIndex] but respects [JsonNames] annotation
+ * and [JsonConfiguration] settings.
  */
 @OptIn(ExperimentalSerializationApi::class)
 internal fun SerialDescriptor.getJsonNameIndex(json: Json, name: String): Int {
-    fun getJsonNameIndexSlowPath(): Int =
-        json.deserializationNamesMap(this)[name] ?: CompositeDecoder.UNKNOWN_NAME
+    if (json.decodeCaseInsensitive(this)) {
+        return getJsonNameIndexSlowPath(json, name.lowercase())
+    }
 
     val strategy = namingStrategy(json)
-    if (strategy != null) return getJsonNameIndexSlowPath()
+    if (strategy != null) return getJsonNameIndexSlowPath(json, name)
     val index = getElementIndex(name)
     // Fast path, do not go through ConcurrentHashMap.get
     // Note, it blocks ability to detect collisions between the primary name and alternate,
@@ -87,7 +114,7 @@ internal fun SerialDescriptor.getJsonNameIndex(json: Json, name: String): Int {
     if (index != CompositeDecoder.UNKNOWN_NAME) return index
     if (!json.configuration.useAlternativeNames) return index
     // Slow path
-    return getJsonNameIndexSlowPath()
+    return getJsonNameIndexSlowPath(json, name)
 }
 
 /**

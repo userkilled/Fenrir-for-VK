@@ -28,140 +28,10 @@ interface ISettings {
     fun notifications(): INotificationSettings
     fun main(): IMainSettings
     fun accounts(): IAccountsSettings
-    fun other(): IOtherSettings
-    interface IOtherSettings {
-        fun getFeedSourceIds(accountId: Long): String?
-        fun setFeedSourceIds(accountId: Long, sourceIds: String?)
-        fun storeFeedScrollState(accountId: Long, state: String?)
-        fun restoreFeedScrollState(accountId: Long): String?
-        fun restoreFeedNextFrom(accountId: Long): String?
-        fun storeFeedNextFrom(accountId: Long, nextFrom: String?)
-        val isAudioBroadcastActive: Boolean
-        val maxBitmapResolution: Int
-        val servicePlaylist: List<Int>
-        val isValidate_tls: Boolean
-        val isNative_parcel_photo: Boolean
-        val isNative_parcel_story: Boolean
-        val isDoLogs: Boolean
-        val isDump_fcm: Boolean
-        val isAutoplay_gif: Boolean
-        val isStrip_news_repost: Boolean
-        val isCommunities_in_page_search: Boolean
-        val isAd_block_story_news: Boolean
-        val isBlock_news_by_words: Set<String>?
-        val isNew_loading_dialog: Boolean
-        fun get_Api_Domain(): String
-        fun get_Auth_Domain(): String
-        val isUse_api_5_90_for_audio: Boolean
-        val isDisable_history: Boolean
-        val isShow_wall_cover: Boolean
-        val isDeveloper_mode: Boolean
-        val isForce_cache: Boolean
-        val isKeepLongpoll: Boolean
-        fun setDisableErrorFCM(en: Boolean)
-        val isDisabledErrorFCM: Boolean
-        val isSettings_no_push: Boolean
-        val isCommentsDesc: Boolean
-        fun toggleCommentsDirection(): Boolean
-        val isInfo_reading: Boolean
-        val isAuto_read: Boolean
-        val isMarkListenedVoice: Boolean
-        val isNot_update_dialogs: Boolean
-        val isBe_online: Boolean
-        val donate_anim_set: Int
-        val colorChat: Int
-        val secondColorChat: Int
-        val isCustom_chat_color: Boolean
-        val colorMyMessage: Int
-        val secondColorMyMessage: Int
-        val isCustom_MyMessage: Boolean
-        val isUse_stop_audio: Boolean
-        val isPlayer_Has_Background: Boolean
-        val isShow_mini_player: Boolean
-        val isEnable_show_recent_dialogs: Boolean
-        fun is_side_navigation(): Boolean
-        fun is_side_no_stroke(): Boolean
-        fun is_side_transition(): Boolean
-        fun is_notification_force_link(): Boolean
-        val isEnable_show_audio_top: Boolean
-        val isUse_internal_downloader: Boolean
-        val isEnable_last_read: Boolean
-        val isNot_read_show: Boolean
-        val isHeaders_in_dialog: Boolean
-        val musicDir: String
-        val photoDir: String
-        val videoDir: String
-        val docDir: String
-        val stickerDir: String
-        val isPhoto_to_user_dir: Boolean
-        val isDownload_voice_ogg: Boolean
-        val isDelete_cache_images: Boolean
-        val isCompress_incoming_traffic: Boolean
-        val isCompress_outgoing_traffic: Boolean
-        val isLimitImage_cache: Int
-        val isDo_not_clear_back_stack: Boolean
-        val isMention_fave: Boolean
-        val isDisabled_encryption: Boolean
-        val isDownload_photo_tap: Boolean
-        val isDisable_sensored_voice: Boolean
-        var isInvertPhotoRev: Boolean
-        val isAudio_save_mode_button: Boolean
-        val isShow_mutual_count: Boolean
-        val isDo_zoom_photo: Boolean
-        val isChange_upload_size: Boolean
-        val isShow_photos_line: Boolean
-        val isShow_photos_date: Boolean
-        var isDisable_likes: Boolean
-        var isDisable_notifications: Boolean
-        val isDo_auto_play_video: Boolean
-        val isVideo_controller_to_decor: Boolean
-        val isVideo_swipes: Boolean
-        val isHint_stickers: Boolean
-        val isEnable_native: Boolean
-        val isRecording_to_opus: Boolean
-        val paganSymbol: Int
-        val isRunes_show: Boolean
-        val musicLifecycle: Int
-        val fFmpegPlugin: Int
-        fun videoExt(): Set<String>
-        fun photoExt(): Set<String>
-        fun audioExt(): Set<String>
-        fun getMaxThumbResolution(): Int
-        fun isEnable_dirs_files_count(): Boolean
-        fun get_last_audio_sync(): Long
-        fun set_last_audio_sync(time: Long)
-        fun get_last_stickers_sync(accountId: Long): Long
-        fun del_last_stickers_sync(accountId: Long)
-        fun set_last_stickers_sync(accountId: Long, time: Long)
-        val isOngoing_player_notification: Boolean
-        fun reloadOwnerChangesMonitor()
-        fun isOwnerInChangesMonitor(ownerId: Long): Boolean
-        fun putOwnerInChangesMonitor(ownerId: Long)
-        fun removeOwnerInChangesMonitor(ownerId: Long)
-        val isAudio_catalog_v2: Boolean
-
-        @get:Lang
-        val language: Int
-        val rendering_mode: Int
-        val endListAnimation: Int
-        fun appStoredVersionEqual(): Boolean
-        var localServer: LocalServerSettings
-        var playerCoverBackgroundSettings: PlayerCoverBackgroundSettings
-        var slidrSettings: SlidrSettings
-        fun getUserNameChanges(userId: Long): String?
-        fun setUserNameChanges(userId: Long, name: String?)
-        fun reloadUserNameChangesSettings(onlyRoot: Boolean)
-        fun getUserNameChangesMap(): Map<String, String>
-        val userNameChangesKeys: Set<String>
-        val customChannelNotif: Int
-        fun nextCustomChannelNotif()
-        val currentParser: Int
-        var catalogV2ListSort: List<Int>
-    }
 
     interface IAccountsSettings {
-        fun observeChanges(): Flowable<Long>
-        fun observeRegistered(): Flowable<IAccountsSettings>
+        val observeChanges: Flowable<Long>
+        val observeRegistered: Flowable<IAccountsSettings>
         val registered: List<Long>
         var current: Long
         val currentAccessToken: String?
@@ -199,6 +69,7 @@ interface ISettings {
         val isNotification_bubbles_enabled: Boolean
         val isMessages_menu_down: Boolean
         val isExpand_voice_transcript: Boolean
+        val isChat_popup_menu: Boolean
 
         @get:ThemeOverlay
         val themeOverlay: Int
@@ -233,7 +104,148 @@ interface ISettings {
         val isLoad_history_notif: Boolean
         val isDont_write: Boolean
         val isOver_ten_attach: Boolean
-        fun cryptVersion(): Int
+        val cryptVersion: Int
+
+        fun getFeedSourceIds(accountId: Long): String?
+        fun setFeedSourceIds(accountId: Long, sourceIds: String?)
+        fun storeFeedScrollState(accountId: Long, state: String?)
+        fun restoreFeedScrollState(accountId: Long): String?
+        fun restoreFeedNextFrom(accountId: Long): String?
+        fun storeFeedNextFrom(accountId: Long, nextFrom: String?)
+        val isAudioBroadcastActive: Boolean
+        val maxBitmapResolution: Int
+        val servicePlaylist: List<Int>
+        val isValidate_tls: Boolean
+        val isNative_parcel_photo: Boolean
+        val isNative_parcel_story: Boolean
+        val isDoLogs: Boolean
+        val isDump_fcm: Boolean
+        val isAutoplay_gif: Boolean
+        val isStrip_news_repost: Boolean
+        val isCommunities_in_page_search: Boolean
+        val isAd_block_story_news: Boolean
+        val isBlock_news_by_words: Set<String>?
+        val isNew_loading_dialog: Boolean
+        val apiDomain: String
+        val authDomain: String
+        val isUse_api_5_90_for_audio: Boolean
+        val isDisable_history: Boolean
+        val isShow_wall_cover: Boolean
+        val isDeveloper_mode: Boolean
+        val isForce_cache: Boolean
+        val isKeepLongpoll: Boolean
+        fun setDisableErrorFCM(en: Boolean)
+        val isDisabledErrorFCM: Boolean
+        val isSettings_no_push: Boolean
+        val isCommentsDesc: Boolean
+        val toggleCommentsDirection: Boolean
+        val isInfo_reading: Boolean
+        val isAuto_read: Boolean
+        val isMarkListenedVoice: Boolean
+        val isNot_update_dialogs: Boolean
+        val isBe_online: Boolean
+        val donate_anim_set: Int
+        val colorChat: Int
+        val secondColorChat: Int
+        val isCustom_chat_color: Boolean
+        val colorMyMessage: Int
+        val secondColorMyMessage: Int
+        val isCustom_MyMessage: Boolean
+        val isUse_stop_audio: Boolean
+        val isPlayer_Has_Background: Boolean
+        val isShow_mini_player: Boolean
+        val isEnable_show_recent_dialogs: Boolean
+        val is_side_navigation: Boolean
+        val is_side_no_stroke: Boolean
+        val is_side_transition: Boolean
+        val is_notification_force_link: Boolean
+        val isEnable_show_audio_top: Boolean
+        val isUse_internal_downloader: Boolean
+        val isEnable_last_read: Boolean
+        val isNot_read_show: Boolean
+        val isHeaders_in_dialog: Boolean
+        val musicDir: String
+        val photoDir: String
+        val videoDir: String
+        val docDir: String
+        val stickerDir: String
+        val isPhoto_to_user_dir: Boolean
+        val isDownload_voice_ogg: Boolean
+        val isDelete_cache_images: Boolean
+        val isCompress_incoming_traffic: Boolean
+        val isCompress_outgoing_traffic: Boolean
+        val isLimitImage_cache: Int
+        val isDo_not_clear_back_stack: Boolean
+        val isMention_fave: Boolean
+        val isDisabled_encryption: Boolean
+        val isDownload_photo_tap: Boolean
+        val isDisable_sensored_voice: Boolean
+        var isInvertPhotoRev: Boolean
+        val isAudio_save_mode_button: Boolean
+        val isShow_mutual_count: Boolean
+        val isDo_zoom_photo: Boolean
+        val isChange_upload_size: Boolean
+        val isInstant_photo_display: Boolean
+        val isShow_photos_line: Boolean
+        val isShow_photos_date: Boolean
+        var isDisable_likes: Boolean
+        var isDisable_notifications: Boolean
+        val isDo_auto_play_video: Boolean
+        val isVideo_controller_to_decor: Boolean
+        val isVideo_swipes: Boolean
+        val isHint_stickers: Boolean
+        val isEnable_native: Boolean
+        val isRecording_to_opus: Boolean
+        val paganSymbol: Int
+        val isRunes_show: Boolean
+        val musicLifecycle: Int
+        val fFmpegPlugin: Int
+        var isRememberLocalAudioAlbum: Boolean
+        var currentLocalAudioAlbum: Int
+        val videoExt: Set<String>
+        val photoExt: Set<String>
+        val audioExt: Set<String>
+        val maxThumbResolution: Int
+        val isEnable_dirs_files_count: Boolean
+        val last_audio_sync: Long
+        fun set_last_audio_sync(time: Long)
+        fun get_last_sticker_sets_sync(accountId: Long): Long
+        fun set_last_sticker_sets_sync(accountId: Long, time: Long)
+        fun get_last_sticker_sets_custom_sync(accountId: Long): Long
+        fun set_last_sticker_sets_custom_sync(accountId: Long, time: Long)
+        fun get_last_sticker_keywords_sync(accountId: Long): Long
+        fun set_last_sticker_keywords_sync(accountId: Long, time: Long)
+        fun del_last_sticker_sets_sync(accountId: Long)
+        fun del_last_sticker_sets_custom_sync(accountId: Long)
+        fun del_last_sticker_keywords_sync(accountId: Long)
+        fun del_last_reaction_assets_sync(accountId: Long)
+        fun set_last_reaction_assets_sync(accountId: Long, time: Long)
+        fun get_last_reaction_assets_sync(accountId: Long): Long
+        fun reloadOwnerChangesMonitor()
+        fun isOwnerInChangesMonitor(ownerId: Long): Boolean
+        fun putOwnerInChangesMonitor(ownerId: Long)
+        fun removeOwnerInChangesMonitor(ownerId: Long)
+        val isAudio_catalog_v2: Boolean
+
+        val picassoDispatcher: Int
+
+        @get:Lang
+        val language: Int
+        val rendering_mode: Int
+        val endListAnimation: Int
+        val appStoredVersionEqual: Boolean
+        var localServer: LocalServerSettings
+        var playerCoverBackgroundSettings: PlayerCoverBackgroundSettings
+        var slidrSettings: SlidrSettings
+        fun getUserNameChanges(userId: Long): String?
+        fun setUserNameChanges(userId: Long, name: String?)
+        fun reloadUserNameChangesSettings(onlyRoot: Boolean)
+        val userNameChangesMap: Map<String, String>
+        val userNameChangesKeys: Set<String>
+        val customChannelNotif: Int
+        fun nextCustomChannelNotif()
+        val currentParser: Int
+        var catalogV2ListSort: List<Int>
     }
 
     interface INotificationSettings {
@@ -282,18 +294,18 @@ interface ISettings {
 
     interface IDrawerSettings {
         var categoriesOrder: List<DrawerCategory>
-        fun observeChanges(): Observable<List<DrawerCategory>>
+        val observeChanges: Observable<List<DrawerCategory>>
         fun reset()
     }
 
     interface ISideDrawerSettings {
         var categoriesOrder: List<DrawerCategory>
-        fun observeChanges(): Observable<List<DrawerCategory>>
+        val observeChanges: Observable<List<DrawerCategory>>
         fun reset()
     }
 
     interface IPushSettings {
-        fun savePushRegistations(data: Collection<VKPushRegistration>)
+        fun savePushRegistrations(data: Collection<VKPushRegistration>)
         val registrations: List<VKPushRegistration>
     }
 
@@ -314,17 +326,17 @@ interface ISettings {
         fun firePinAttemptNow()
         fun clearPinHistory()
         val pinEnterHistory: List<Long>
-        fun hasPinHash(): Boolean
-        fun pinHistoryDepthValue(): Int
-        fun needHideMessagesBodyForNotif(): Boolean
+        val hasPinHash: Boolean
+        val pinHistoryDepthValue: Int
+        val needHideMessagesBodyForNotif: Boolean
         fun addHiddenDialog(peerId: Long)
         fun removeHiddenDialog(peerId: Long)
-        fun hasHiddenDialogs(): Boolean
+        val hasHiddenDialogs: Boolean
         fun isHiddenDialog(peerId: Long): Boolean
         var showHiddenDialogs: Boolean
         fun reloadHiddenDialogSettings()
         fun updateLastPinTime()
-        fun IsShow_hidden_accounts(): Boolean
+        val IsShow_hidden_accounts: Boolean
     }
 
     interface IUISettings {

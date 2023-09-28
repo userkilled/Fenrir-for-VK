@@ -6,13 +6,14 @@ import dev.ragnarok.fenrir.model.wrappers.SelectablePhotoWrapper
 import dev.ragnarok.fenrir.nonNullNoEmpty
 import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.util.AppPerms.hasReadStoragePermissionSimple
-import dev.ragnarok.fenrir.util.serializeble.json.internal.JavaStreamSerialReader
+import dev.ragnarok.fenrir.util.serializeble.json.internal.OkioSerialReader
 import dev.ragnarok.fenrir.util.serializeble.json.internal.WriteMode
 import dev.ragnarok.fenrir.util.serializeble.json.internal.lexer.ReaderJsonLexer
 import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.core.CompletableEmitter
+import okio.buffer
+import okio.source
 import java.io.File
-import java.io.FileInputStream
 import java.io.IOException
 import java.util.LinkedList
 import java.util.Locale
@@ -43,7 +44,7 @@ class FileExistJVM : AbsFileExist {
             }
         }
         RemoteAudios.clear()
-        val audios = File(Settings.get().other().musicDir, "local_server_audio_list.json")
+        val audios = File(Settings.get().main().musicDir, "local_server_audio_list.json")
         if (!audios.exists()) {
             if (needLock) {
                 setBusy(false)
@@ -52,7 +53,7 @@ class FileExistJVM : AbsFileExist {
         }
         try {
             val reader = ReaderJsonLexer(
-                JavaStreamSerialReader(FileInputStream(audios))
+                OkioSerialReader(audios.source().buffer())
             )
             reader.consumeNextToken(WriteMode.LIST.begin)
             while (reader.canConsumeValue()) {
@@ -106,7 +107,7 @@ class FileExistJVM : AbsFileExist {
             if (!setBusy(true)) {
                 return@create
             }
-            val temp = File(Settings.get().other().photoDir)
+            val temp = File(Settings.get().main().photoDir)
             if (!temp.exists()) {
                 setBusy(false)
                 t.onComplete()
@@ -155,7 +156,7 @@ class FileExistJVM : AbsFileExist {
                 return@create
             }
             findRemoteAudios(context, false)
-            val temp = File(Settings.get().other().musicDir)
+            val temp = File(Settings.get().main().musicDir)
             if (!temp.exists()) {
                 setBusy(false)
                 t.onComplete()

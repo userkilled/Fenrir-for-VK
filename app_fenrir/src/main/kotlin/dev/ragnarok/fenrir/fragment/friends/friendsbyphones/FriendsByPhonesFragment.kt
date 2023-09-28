@@ -7,7 +7,12 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Bundle
 import android.os.Environment
-import android.view.*
+import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,7 +22,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import dev.ragnarok.fenrir.Constants.PICASSO_TAG
 import dev.ragnarok.fenrir.Extra
 import dev.ragnarok.fenrir.R
 import dev.ragnarok.fenrir.activity.ActivityFeatures
@@ -116,7 +120,7 @@ class FriendsByPhonesFragment : BaseMvpFragment<FriendsByPhonesPresenter, IFrien
         mEmpty = root.findViewById(R.id.empty)
         recyclerView.layoutManager =
             LinearLayoutManager(requireActivity(), LinearLayoutManager.VERTICAL, false)
-        recyclerView.addOnScrollListener(PicassoPauseOnScrollListener(PICASSO_TAG))
+        PicassoPauseOnScrollListener.addListener(recyclerView)
         mAdapter = ContactsAdapter(requireActivity(), emptyList())
         mAdapter?.setClickListener(this)
         recyclerView.adapter = mAdapter
@@ -242,7 +246,7 @@ class FriendsByPhonesFragment : BaseMvpFragment<FriendsByPhonesPresenter, IFrien
         return object : IPresenterFactory<FriendsByPhonesPresenter> {
             override fun create(): FriendsByPhonesPresenter {
                 val accountId = requireArguments().getLong(Extra.ACCOUNT_ID)
-                return FriendsByPhonesPresenter(accountId, requireActivity(), saveInstanceState)
+                return FriendsByPhonesPresenter(accountId, saveInstanceState)
             }
         }
     }

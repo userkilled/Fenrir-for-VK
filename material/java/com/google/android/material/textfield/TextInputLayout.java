@@ -191,6 +191,11 @@ import java.util.LinkedHashSet;
  * to {@code getParent()} on children of the TextInputLayout -- such as a TextInputEditText -- may
  * not return the TextInputLayout itself, but rather an intermediate View. If you need to access a
  * View directly, set an {@code android:id} and use {@link View#findViewById(int)}.
+ *
+ * <p>For more information, see the <a
+ * href="https://github.com/material-components/material-components-android/blob/master/docs/components/TextField.md">component
+ * developer guidance</a> and <a href="https://material.io/components/text-fields/overview">design
+ * guidelines</a>.
  */
 public class TextInputLayout extends LinearLayout {
 
@@ -949,8 +954,16 @@ public class TextInputLayout extends LinearLayout {
             .setBottomLeftCornerSize(cornerRadius)
             .setBottomRightCornerSize(cornerRadius)
             .build();
+
+    ColorStateList dropDownBackgroundTint = null;
+    if (editText instanceof MaterialAutoCompleteTextView) {
+      MaterialAutoCompleteTextView materialAutoCompleteTextView =
+          ((MaterialAutoCompleteTextView) editText);
+      dropDownBackgroundTint = materialAutoCompleteTextView.getDropDownBackgroundTintList();
+    }
     MaterialShapeDrawable popupDrawable =
-        MaterialShapeDrawable.createWithElevationOverlay(getContext(), elevation);
+        MaterialShapeDrawable.createWithElevationOverlay(
+            getContext(), elevation, dropDownBackgroundTint);
     popupDrawable.setShapeAppearanceModel(shapeAppearanceModel);
     popupDrawable.setPadding(0, verticalPadding, 0, verticalPadding);
     return popupDrawable;
@@ -3677,9 +3690,9 @@ public class TextInputLayout extends LinearLayout {
   }
 
   /**
-   * Sets {@link android.widget.ImageView.ScaleType} for the start icon's ImageButton.
+   * Sets {@link ImageView.ScaleType} for the start icon's ImageButton.
    *
-   * @param scaleType {@link android.widget.ImageView.ScaleType} for the start icon's ImageButton.
+   * @param scaleType {@link ImageView.ScaleType} for the start icon's ImageButton.
    * @attr ref android.support.design.button.R.styleable#TextInputLayout_startIconScaleType
    * @see #getStartIconScaleType()
    */
@@ -3688,9 +3701,9 @@ public class TextInputLayout extends LinearLayout {
   }
 
   /**
-   * Returns the {@link android.widget.ImageView.ScaleType} for the start icon's ImageButton.
+   * Returns the {@link ImageView.ScaleType} for the start icon's ImageButton.
    *
-   * @return Returns the {@link android.widget.ImageView.ScaleType} for the start icon's ImageButton.
+   * @return Returns the {@link ImageView.ScaleType} for the start icon's ImageButton.
    * @attr ref android.support.design.button.R.styleable#TextInputLayout_startIconScaleType
    * @see #setStartIconScaleType(ScaleType)
    */
@@ -3700,9 +3713,9 @@ public class TextInputLayout extends LinearLayout {
   }
 
   /**
-   * Sets {@link android.widget.ImageView.ScaleType} for the end icon's ImageButton.
+   * Sets {@link ImageView.ScaleType} for the end icon's ImageButton.
    *
-   * @param scaleType {@link android.widget.ImageView.ScaleType} for the end icon's ImageButton.
+   * @param scaleType {@link ImageView.ScaleType} for the end icon's ImageButton.
    * @attr ref android.support.design.button.R.styleable#TextInputLayout_endIconScaleType
    * @see #getEndIconScaleType()
    */
@@ -3711,9 +3724,9 @@ public class TextInputLayout extends LinearLayout {
   }
 
   /**
-   * Returns the {@link android.widget.ImageView.ScaleType} for the end icon's ImageButton.
+   * Returns the {@link ImageView.ScaleType} for the end icon's ImageButton.
    *
-   * @return Returns the {@link android.widget.ImageView.ScaleType} for the end icon's ImageButton.
+   * @return Returns the {@link ImageView.ScaleType} for the end icon's ImageButton.
    * @attr ref android.support.design.button.R.styleable#TextInputLayout_endIconScaleType
    * @see #setEndIconScaleType(ScaleType)
    */
@@ -4416,7 +4429,7 @@ public class TextInputLayout extends LinearLayout {
       return;
     }
 
-    Drawable cursorDrawable = editText.getTextCursorDrawable();
+    Drawable cursorDrawable = DrawableCompat.wrap(editText.getTextCursorDrawable()).mutate();
     if (isOnError() && cursorErrorColor != null) {
       color = cursorErrorColor;
     }

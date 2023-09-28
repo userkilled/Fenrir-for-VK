@@ -1,13 +1,16 @@
 package dev.ragnarok.fenrir.media.music
 
 import android.app.Activity
-import android.content.*
+import android.content.ComponentName
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.RemoteException
 import dev.ragnarok.fenrir.R
 import dev.ragnarok.fenrir.model.Audio
 import dev.ragnarok.fenrir.settings.Settings
-import dev.ragnarok.fenrir.util.Logger
 import dev.ragnarok.fenrir.util.existfile.AbsFileExist
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.subjects.PublishSubject
@@ -20,36 +23,23 @@ object MusicPlaybackController {
     var mService: IAudioPlayerService? = null
 
     lateinit var tracksExist: AbsFileExist
-    private var sForegroundActivities = 0
-    fun registerBroadcast(appContext: Context) {
-        val receiver: BroadcastReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent?) {
-                if (intent == null || intent.action == null) return
-                var result = PlayerStatus.SERVICE_KILLED
-                when (intent.action) {
-                    MusicPlaybackService.PREPARED, MusicPlaybackService.PLAYSTATE_CHANGED -> result =
-                        PlayerStatus.UPDATE_PLAY_PAUSE
 
-                    MusicPlaybackService.SHUFFLEMODE_CHANGED -> result =
-                        PlayerStatus.SHUFFLEMODE_CHANGED
+    fun publishFromServiceState(action: String) {
+        var result = PlayerStatus.SERVICE_KILLED
+        when (action) {
+            MusicPlaybackService.PREPARED, MusicPlaybackService.PLAYSTATE_CHANGED -> result =
+                PlayerStatus.UPDATE_PLAY_PAUSE
 
-                    MusicPlaybackService.REPEATMODE_CHANGED -> result =
-                        PlayerStatus.REPEATMODE_CHANGED
+            MusicPlaybackService.SHUFFLEMODE_CHANGED -> result =
+                PlayerStatus.SHUFFLEMODE_CHANGED
 
-                    MusicPlaybackService.META_CHANGED -> result = PlayerStatus.UPDATE_TRACK_INFO
-                    MusicPlaybackService.QUEUE_CHANGED -> result = PlayerStatus.UPDATE_PLAY_LIST
-                }
-                SERVICE_BIND_PUBLISHER.onNext(result)
-            }
+            MusicPlaybackService.REPEATMODE_CHANGED -> result =
+                PlayerStatus.REPEATMODE_CHANGED
+
+            MusicPlaybackService.META_CHANGED -> result = PlayerStatus.UPDATE_TRACK_INFO
+            MusicPlaybackService.QUEUE_CHANGED -> result = PlayerStatus.UPDATE_PLAY_LIST
         }
-        val filter = IntentFilter()
-        filter.addAction(MusicPlaybackService.PLAYSTATE_CHANGED)
-        filter.addAction(MusicPlaybackService.SHUFFLEMODE_CHANGED)
-        filter.addAction(MusicPlaybackService.REPEATMODE_CHANGED)
-        filter.addAction(MusicPlaybackService.META_CHANGED)
-        filter.addAction(MusicPlaybackService.PREPARED)
-        filter.addAction(MusicPlaybackService.QUEUE_CHANGED)
-        appContext.registerReceiver(receiver, filter)
+        SERVICE_BIND_PUBLISHER.onNext(result)
     }
 
     fun bindToServiceWithoutStart(
@@ -173,7 +163,7 @@ object MusicPlaybackController {
 
     val miniPlayerVisibility: Boolean
         get() {
-            if (!Settings.get().other().isShow_mini_player) return false
+            if (!Settings.get().main().isShow_mini_player) return false
             try {
                 return mService?.miniplayerVisibility == true
             } catch (ignored: Exception) {
@@ -401,6 +391,13 @@ object MusicPlaybackController {
         }
     }
 
+    fun doNotDestroyWhenActivityRecreated() {
+        try {
+            mService?.doNotDestroyWhenActivityRecreated()
+        } catch (ignored: RemoteException) {
+        }
+    }
+
     /**
      * @return The current position time of the track
      */
@@ -446,36 +443,6 @@ object MusicPlaybackController {
     fun playerStatus(): Int {
         if (isPreparing || isPlaying) return 1
         return if (currentAudio != null) 2 else 0
-    }
-
-    /**
-     * Used to build and show a notification when player is sent into the
-     * background
-     *
-     * @param context The [Context] to use.
-     */
-    fun notifyForegroundStateChanged(context: Context, inForeground: Boolean) {
-        val old = sForegroundActivities
-        if (inForeground) {
-            sForegroundActivities++
-        } else {
-            sForegroundActivities--
-            if (sForegroundActivities < 0) sForegroundActivities = 0
-        }
-        if (old == 0 || sForegroundActivities == 0) {
-            try {
-                val nowInForeground = sForegroundActivities != 0
-                Logger.d(TAG, "notifyForegroundStateChanged, nowInForeground: $nowInForeground")
-                val intent = Intent(context, MusicPlaybackService::class.java)
-                intent.action = MusicPlaybackService.FOREGROUND_STATE_CHANGED
-                intent.putExtra(MusicPlaybackService.NOW_IN_FOREGROUND, nowInForeground)
-                context.startService(intent)
-            } catch (e: IllegalStateException) {
-                e.printStackTrace()
-            } catch (e: SecurityException) {
-                e.printStackTrace()
-            }
-        }
     }
 
     class ServiceBinder(private val mCallback: ServiceConnection?) : ServiceConnection {

@@ -72,6 +72,9 @@ namespace TagLib {
        */
       virtual ~Frame();
 
+      Frame(const Frame &) = delete;
+      Frame &operator=(const Frame &) = delete;
+
       /*!
        * Returns the Frame ID (Structure, <a href="id3v2-structure.html#4">4</a>)
        * (Frames, <a href="id3v2-frames.html#4">4</a>)
@@ -85,21 +88,8 @@ namespace TagLib {
 
       /*!
        * Returns the size of the frame header
-       *
-       * \deprecated This is only accurate for ID3v2.3 or ID3v2.4.  Please use
-       * the call below which accepts an ID3v2 version number.  In the next
-       * non-binary compatible release this will be made into a non-static
-       * member that checks the internal ID3v2 version.
        */
-      static unsigned int headerSize(); // BIC: make non-static
-
-      /*!
-       * Returns the size of the frame header for the given ID3v2 version.
-       *
-       * \deprecated Please see the explanation above.
-       */
-      // BIC: remove
-      static unsigned int headerSize(unsigned int version);
+      unsigned int headerSize();
 
       /*!
        * Sets the data that will be used as the frame.  Since the length is not
@@ -227,25 +217,7 @@ namespace TagLib {
        * This is useful for reading strings sequentially.
        */
       String readStringField(const ByteVector &data, String::Type encoding,
-                             int *position = 0);
-
-      /*!
-       * Checks a the list of string values to see if they can be used with the
-       * specified encoding and returns the recommended encoding.
-       */
-      // BIC: remove and make non-static
-      static String::Type checkEncoding(const StringList &fields,
-                                        String::Type encoding);
-
-      /*!
-       * Checks a the list of string values to see if they can be used with the
-       * specified encoding and returns the recommended encoding. This method
-       * also checks the ID3v2 version and makes sure the encoding can be used
-       * in the specified version.
-       */
-      // BIC: remove and make non-static
-      static String::Type checkEncoding(const StringList &fields,
-                                        String::Type encoding, unsigned int version);
+                             int *position = nullptr);
 
       /*!
        * Checks a the list of string values to see if they can be used with the
@@ -261,9 +233,8 @@ namespace TagLib {
        * Parses the contents of this frame as PropertyMap. If that fails, the returned
        * PropertyMap will be empty, and its unsupportedData() will contain this frame's
        * ID.
-       * BIC: Will be a virtual function in future releases.
        */
-      PropertyMap asProperties() const;
+      virtual PropertyMap asProperties() const;
 
       /*!
        * Returns an appropriate ID3 frame ID for the given free-form tag key. This method
@@ -304,12 +275,9 @@ namespace TagLib {
           PropertyMap &tiplProperties, PropertyMap &tmclProperties);
 
     private:
-      Frame(const Frame &);
-      Frame &operator=(const Frame &);
-
       class FramePrivate;
       friend class FramePrivate;
-      FramePrivate *d;
+      std::unique_ptr<FramePrivate> d;
     };
 
     //! ID3v2 frame header implementation
@@ -334,16 +302,6 @@ namespace TagLib {
        * contain a 4 byte frame ID, and optionally can contain flag data and the
        * frame size.  i.e. Just the frame id -- "TALB" -- is a valid value.
        *
-       * \deprecated Please use the constructor below that accepts a version
-       * number.
-       */
-      TAGLIB_DEPRECATED Header(const ByteVector &data, bool synchSafeInts);
-
-      /*!
-       * Construct a Frame Header based on \a data.  \a data must at least
-       * contain a 4 byte frame ID, and optionally can contain flag data and the
-       * frame size.  i.e. Just the frame id -- "TALB" -- is a valid value.
-       *
        * \a version should be the ID3v2 version of the tag.
        */
       explicit Header(const ByteVector &data, unsigned int version = 4);
@@ -353,13 +311,8 @@ namespace TagLib {
        */
       virtual ~Header();
 
-      /*!
-       * Sets the data for the Header.
-       *
-       * \deprecated Please use the version below that accepts an ID3v2 version
-       * number.
-       */
-      TAGLIB_DEPRECATED void setData(const ByteVector &data, bool synchSafeInts);
+      Header(const Header &) = delete;
+      Header &operator=(const Header &) = delete;
 
       /*!
        * Sets the data for the Header.  \a version should indicate the ID3v2
@@ -408,23 +361,8 @@ namespace TagLib {
 
       /*!
        * Returns the size of the frame header in bytes.
-       *
-       * \deprecated Please use the version of this method that accepts a
-       * version.  This is only accurate for ID3v2.3 and ID3v2.4.  This will be
-       * removed in the next binary incompatible release (2.0) and will be
-       * replaced with a non-static method that checks the frame version.
        */
-      // BIC: make non-static
-      static unsigned int size();
-
-      /*!
-       * Returns the size of the frame header in bytes for the ID3v2 version
-       * that's given.
-       *
-       * \deprecated Please see the explanation in the version above.
-       */
-      // BIC: remove
-      static unsigned int size(unsigned int version);
+      unsigned int size();
 
       /*!
        * Returns true if the flag for tag alter preservation is set.
@@ -448,7 +386,7 @@ namespace TagLib {
        *
        * \see tagAlterPreservation()
        */
-      void setTagAlterPreservation(bool discard);
+      void setTagAlterPreservation(bool preserve);
 
       /*!
        * Returns true if the flag for file alter preservation is set.
@@ -504,17 +442,9 @@ namespace TagLib {
        */
       ByteVector render() const;
 
-      /*!
-       * \deprecated Use fileAlterPreservation().
-       */
-      TAGLIB_DEPRECATED bool frameAlterPreservation() const;
-
     private:
-      Header(const Header &);
-      Header &operator=(const Header &);
-
       class HeaderPrivate;
-      HeaderPrivate *d;
+      std::unique_ptr<HeaderPrivate> d;
     };
 
   }  // namespace ID3v2

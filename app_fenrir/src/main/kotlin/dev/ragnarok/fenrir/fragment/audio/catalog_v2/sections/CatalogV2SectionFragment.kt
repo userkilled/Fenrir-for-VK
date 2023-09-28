@@ -13,7 +13,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import dev.ragnarok.fenrir.Constants
 import dev.ragnarok.fenrir.Extra
 import dev.ragnarok.fenrir.R
 import dev.ragnarok.fenrir.activity.ActivityFeatures
@@ -83,7 +82,7 @@ class CatalogV2SectionFragment :
         recyclerView = root.findViewById(R.id.recycleView)
         recyclerView?.layoutManager = LinearLayoutManager(requireActivity())
         //recyclerView.setRecycledViewPool(CatalogV2SectionAdapter.poolCatalogV2Section)
-        recyclerView?.addOnScrollListener(PicassoPauseOnScrollListener(Constants.PICASSO_TAG))
+        PicassoPauseOnScrollListener.addListener(recyclerView)
         recyclerView?.addOnScrollListener(object : EndlessRecyclerOnScrollListener(4, 1000) {
             override fun onScrollToLastElement() {
                 presenter?.onNext()
@@ -174,12 +173,17 @@ class CatalogV2SectionFragment :
     override fun updateLayoutManager(type: String) {
         recyclerView?.let {
             it.layoutManager = when (type) {
-                "music_playlists", "music_recommended_playlists", "links" -> {
+                "links" -> {
                     val columnCount = resources.getInteger(R.integer.photos_column_count)
                     GridLayoutManager(requireActivity(), columnCount)
                 }
 
-                "videos", "artist_videos" -> {
+                "music_recommended_playlists" -> {
+                    val columnCount = resources.getInteger(R.integer.articles_column_count)
+                    GridLayoutManager(requireActivity(), columnCount)
+                }
+
+                "music_playlists", "videos", "artist_videos" -> {
                     val columnCount = resources.getInteger(R.integer.videos_column_count)
                     GridLayoutManager(requireActivity(), columnCount)
                 }

@@ -76,8 +76,9 @@ import dev.ragnarok.filegallery.view.MySearchView
 import dev.ragnarok.filegallery.view.natives.rlottie.RLottieImageView
 import io.reactivex.rxjava3.core.Single
 import io.reactivex.rxjava3.disposables.Disposable
+import okio.buffer
+import okio.source
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.FilenameFilter
 import java.util.concurrent.TimeUnit
@@ -183,7 +184,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                         result.data?.getStringExtra(Extra.PATH) ?: return@registerForActivityResult
                     )
                 if (file.exists()) {
-                    val objApp = kJson.parseToJsonElement(FileInputStream(file)).jsonObject
+                    val objApp = kJson.parseToJsonElement(file.source().buffer()).jsonObject
                     if (objApp["app"]?.asJsonObjectSafe?.get("settings_format")?.asPrimitiveSafe?.intOrNull != Constants.EXPORT_SETTINGS_FORMAT) {
                         createCustomToast(requireActivity(), view)?.setDuration(Toast.LENGTH_LONG)
                             ?.showToastError(R.string.wrong_settings_format)
@@ -437,6 +438,23 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 initialSelection = "1"
                 titleRes = R.string.player_cover_transform
             }
+
+            switch("instant_photo_display") {
+                defaultValue = Settings.get().main().isInstant_photo_display
+                titleRes = R.string.instant_photo_display
+            }
+
+            singleChoice(
+                "picasso_dispatcher",
+                selItems(R.array.picasso_dispatcher_names, R.array.picasso_dispatcher_values),
+                parentFragmentManager
+            ) {
+                initialSelection = Settings.get().main().picassoDispatcher.toString()
+                titleRes = R.string.picasso_dispatcher
+                onSelectionChange {
+                    clear_cache()
+                }
+            }
         }
         pref("security") {
             titleRes = R.string.security
@@ -457,10 +475,6 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 onCheckedChange {
                     requireActivity().recreate()
                 }
-            }
-
-            switch("ongoing_player_notification") {
-                titleRes = R.string.ongoing_player_notification
             }
 
             switch("use_long_click_download") {
@@ -705,12 +719,12 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 ),
                 parentFragmentManager
             ) {
-                initialSelection = "2"
+                initialSelection = "0"
                 titleRes = R.string.rendering_mode
                 dependency = "developer_mode"
                 visible = Utils.hasPie()
                 onSelectionChange { it ->
-                    var sz = 2
+                    var sz = 0
                     try {
                         sz = it.trim { it <= ' ' }.toInt()
                     } catch (ignored: NumberFormatException) {
@@ -797,6 +811,15 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                             ).absolutePath || sel.absolutePath == File(
                                 Environment.getExternalStorageDirectory(),
                                 ".sstmp"
+                            ).absolutePath || sel.absolutePath == File(
+                                Environment.getExternalStorageDirectory(),
+                                ".SLOGAN"
+                            ).absolutePath || sel.absolutePath == File(
+                                Environment.getExternalStorageDirectory(),
+                                ".\$Trash\$"
+                            ).absolutePath || sel.absolutePath == File(
+                                Environment.getExternalStorageDirectory(),
+                                "OplusOS"
                             ).absolutePath || sel.absolutePath == File(
                                 Environment.getExternalStorageDirectory(),
                                 ".time"
@@ -956,7 +979,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
     }
 
     private fun onSecurityClick() {
-        if (Settings.get().security().hasPinHash()) {
+        if (Settings.get().security().hasPinHash) {
             requestPin.launch(Intent(requireActivity(), EnterPinActivity::class.java))
         } else {
             PlaceFactory.securitySettingsPlace.tryOpenWith(requireActivity())
@@ -1050,7 +1073,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {}
             })
             val settings = Settings.get()
-                .main().getPlayerCoverBackgroundSettings()
+                .main().playerCoverBackgroundSettings
             enabledRotation.isChecked = settings.enabled_rotation
             invertRotation.isChecked = settings.invert_rotation
             fadeSaturation.isChecked = settings.fade_saturation
@@ -1105,7 +1128,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
             val enabled: MaterialSwitch = view.findViewById(R.id.enabled_server)
             val enabled_audio_local_sync: MaterialSwitch =
                 view.findViewById(R.id.enabled_audio_local_sync)
-            val settings = Settings.get().main().getLocalServer()
+            val settings = Settings.get().main().localServer
             url.setText(settings.url)
             password.setText(settings.password)
             enabled.isChecked = settings.enabled
@@ -1192,8 +1215,12 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     progress: Int,
                     fromUser: Boolean
                 ) {
-                    textVerticalSensitive.text =
-                        getString(R.string.slidr_sensitive, progress)
+                    if (fromUser && progress < 20) {
+                        verticalSensitive.progress = 20
+                        textVerticalSensitive.text = getString(R.string.slidr_sensitive, 20)
+                    } else {
+                        textVerticalSensitive.text = getString(R.string.slidr_sensitive, progress)
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -1206,8 +1233,12 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     progress: Int,
                     fromUser: Boolean
                 ) {
-                    textHorizontalSensitive.text =
-                        getString(R.string.slidr_sensitive, progress)
+                    if (fromUser && progress < 20) {
+                        horizontalSensitive.progress = 20
+                        textHorizontalSensitive.text = getString(R.string.slidr_sensitive, 20)
+                    } else {
+                        textHorizontalSensitive.text = getString(R.string.slidr_sensitive, progress)
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar) {}
@@ -1220,8 +1251,14 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     progress: Int,
                     fromUser: Boolean
                 ) {
-                    textVerticalVelocityThreshold.text =
-                        getString(R.string.slidr_velocity_threshold, progress)
+                    if (fromUser && progress < 4) {
+                        verticalVelocityThreshold.progress = 4
+                        textVerticalVelocityThreshold.text =
+                            getString(R.string.slidr_velocity_threshold, 4)
+                    } else {
+                        textVerticalVelocityThreshold.text =
+                            getString(R.string.slidr_velocity_threshold, progress)
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -1234,8 +1271,14 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     progress: Int,
                     fromUser: Boolean
                 ) {
-                    textHorizontalVelocityThreshold.text =
-                        getString(R.string.slidr_velocity_threshold, progress)
+                    if (fromUser && progress < 4) {
+                        horizontalVelocityThreshold.progress = 4
+                        textHorizontalVelocityThreshold.text =
+                            getString(R.string.slidr_velocity_threshold, 4)
+                    } else {
+                        textHorizontalVelocityThreshold.text =
+                            getString(R.string.slidr_velocity_threshold, progress)
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar) {}
@@ -1248,8 +1291,14 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     progress: Int,
                     fromUser: Boolean
                 ) {
-                    textVerticalDistanceThreshold.text =
-                        getString(R.string.slidr_distance_threshold, progress)
+                    if (fromUser && progress < 4) {
+                        verticalDistanceThreshold.progress = 4
+                        textVerticalDistanceThreshold.text =
+                            getString(R.string.slidr_distance_threshold, 4)
+                    } else {
+                        textVerticalDistanceThreshold.text =
+                            getString(R.string.slidr_distance_threshold, progress)
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -1262,15 +1311,21 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     progress: Int,
                     fromUser: Boolean
                 ) {
-                    textHorizontalDistanceThreshold.text =
-                        getString(R.string.slidr_distance_threshold, progress)
+                    if (fromUser && progress < 4) {
+                        horizontalDistanceThreshold.progress = 4
+                        textHorizontalDistanceThreshold.text =
+                            getString(R.string.slidr_distance_threshold, 4)
+                    } else {
+                        textHorizontalDistanceThreshold.text =
+                            getString(R.string.slidr_distance_threshold, progress)
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar) {}
                 override fun onStopTrackingTouch(seekBar: SeekBar) {}
             })
             val settings = Settings.get()
-                .main().getSlidrSettings()
+                .main().slidrSettings
             verticalSensitive.progress = (settings.vertical_sensitive * 100).toInt()
             horizontalSensitive.progress = (settings.horizontal_sensitive * 100).toInt()
 

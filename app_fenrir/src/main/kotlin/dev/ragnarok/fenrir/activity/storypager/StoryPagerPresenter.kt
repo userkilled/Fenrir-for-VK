@@ -1,6 +1,5 @@
 package dev.ragnarok.fenrir.activity.storypager
 
-import android.content.Context
 import android.os.Bundle
 import dev.ragnarok.fenrir.App.Companion.instance
 import dev.ragnarok.fenrir.Includes.storyPlayerFactory
@@ -16,8 +15,6 @@ import dev.ragnarok.fenrir.nonNullNoEmpty
 import dev.ragnarok.fenrir.requireNonNull
 import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.util.AppPerms.hasReadWriteStoragePermission
-import dev.ragnarok.fenrir.util.DownloadWorkUtils.doDownloadPhoto
-import dev.ragnarok.fenrir.util.DownloadWorkUtils.doDownloadVideo
 import dev.ragnarok.fenrir.util.DownloadWorkUtils.makeLegalFilename
 import dev.ragnarok.fenrir.util.Utils.firstNonEmptyString
 import java.io.File
@@ -28,7 +25,6 @@ class StoryPagerPresenter(
     accountId: Long,
     private val mStories: ArrayList<Story>,
     private var mCurrentIndex: Int,
-    private val context: Context,
     savedInstanceState: Bundle?
 ) : AccountDependencyPresenter<IStoryPagerView>(accountId, savedInstanceState),
     IStatusChangeListener, IStoryPlayer.IVideoSizeChangeListener {
@@ -256,14 +252,14 @@ class StoryPagerPresenter(
             story.video?.setTitle(story.owner?.fullName)
             url.nonNullNoEmpty {
                 story.video.requireNonNull { s ->
-                    doDownloadVideo(context, s, it, "Story")
+                    view?.downloadVideo(s, it, "Story")
                 }
             }
         }
     }
 
     private fun doSaveOnDrive(photo: Story) {
-        val dir = File(Settings.get().other().photoDir)
+        val dir = File(Settings.get().main().photoDir)
         if (!dir.isDirectory) {
             val created = dir.mkdirs()
             if (!created) {
@@ -287,7 +283,7 @@ class StoryPagerPresenter(
 
     private fun downloadResult(Prefix: String?, dirF: File, photo: Photo) {
         var dir = dirF
-        if (Prefix != null && Settings.get().other().isPhoto_to_user_dir) {
+        if (Prefix != null && Settings.get().main().isPhoto_to_user_dir) {
             val dir_final = File(dir.absolutePath + "/" + Prefix)
             if (!dir_final.isDirectory) {
                 val created = dir_final.mkdirs()
@@ -300,8 +296,7 @@ class StoryPagerPresenter(
         }
         val url = photo.getUrlForSize(PhotoSize.W, true)
         if (url != null) {
-            doDownloadPhoto(
-                context,
+            view?.downloadPhoto(
                 url,
                 dir.absolutePath,
                 (if (Prefix != null) Prefix + "_" else "") + transform_owner(photo.ownerId) + "_" + photo.getObjectId()

@@ -85,7 +85,7 @@ class PicassoInstance @SuppressLint("CheckResult") private constructor(
                 chain.proceed(request)
             }).addInterceptor(UncompressDefaultInterceptor)
         /*
-        if (Settings.get().other().isLimit_cache) {
+        if (Settings.get().main().isLimit_cache) {
             builder.addNetworkInterceptor(Interceptor { chain: Interceptor.Chain ->
                 chain.proceed(chain.request()).newBuilder()
                     .header("Cache-Control", "max-age=86400").build()
@@ -93,10 +93,10 @@ class PicassoInstance @SuppressLint("CheckResult") private constructor(
         }
          */
         ProxyUtil.applyProxyConfig(builder, proxySettings.activeProxy)
-        BitmapSafeResize.setMaxResolution(Settings.get().other().maxBitmapResolution)
-        BitmapSafeResize.setHardwareRendering(Settings.get().other().rendering_mode)
-        CoverSafeResize.setMaxResolution(Settings.get().other().getMaxThumbResolution())
-        return Picasso.Builder(app)
+        BitmapSafeResize.setMaxResolution(Settings.get().main().maxBitmapResolution)
+        BitmapSafeResize.setHardwareRendering(Settings.get().main().rendering_mode)
+        CoverSafeResize.setMaxResolution(Settings.get().main().maxThumbResolution)
+        val picassoBuilder = Picasso.Builder(app)
             .defaultBitmapConfig(Bitmap.Config.ARGB_8888)
             .client(builder.build())
             .withCacheSize(calculateMemoryCacheSize(app))
@@ -104,7 +104,10 @@ class PicassoInstance @SuppressLint("CheckResult") private constructor(
             .addRequestHandler(PicassoMediaMetadataHandler())
             .addRequestHandler(PicassoFileManagerHandler(app))
             .addRequestHandler(PicassoFullLocalRequestHandler(app))
-            .build()
+        if (Settings.get().main().picassoDispatcher == 1) {
+            picassoBuilder.dispatchers()
+        }
+        return picassoBuilder.build()
     }
 
     fun clear_cache() {
@@ -211,7 +214,7 @@ class PicassoInstance @SuppressLint("CheckResult") private constructor(
         }
 
         internal fun calculateMemoryCacheSize(context: Context): Int {
-            val limit_cache_images = Settings.get().other().isLimitImage_cache
+            val limit_cache_images = Settings.get().main().isLimitImage_cache
 
             val am = ContextCompat.getSystemService(context, ActivityManager::class.java)
             am ?: return (if (limit_cache_images > 2) limit_cache_images else 256) * 1024 * 1024
@@ -230,7 +233,7 @@ class PicassoInstance @SuppressLint("CheckResult") private constructor(
     }
 
     init {
-        proxySettings.observeActive()
+        proxySettings.observeActive
             .subscribe { onProxyChanged() }
     }
 }

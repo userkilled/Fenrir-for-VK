@@ -23,48 +23,38 @@
  *   http://www.mozilla.org/MPL/                                           *
  ***************************************************************************/
 
-#include "trefcounter.h"
-
 namespace TagLib {
 
 ////////////////////////////////////////////////////////////////////////////////
 // public members
 ////////////////////////////////////////////////////////////////////////////////
 
-// BIC change to RefCounter
 template <class Key, class T>
 template <class KeyP, class TP>
-class Map<Key, T>::MapPrivate : public RefCounterOld
+class Map<Key, T>::MapPrivate
 {
 public:
-  MapPrivate() : RefCounterOld() {}
+  MapPrivate() = default;
 #ifdef WANT_CLASS_INSTANTIATION_OF_MAP
-  MapPrivate(const std::map<class KeyP, class TP>& m) : RefCounterOld(), map(m) {}
+  MapPrivate(const std::map<class KeyP, class TP>& m) : map(m) {}
   std::map<class KeyP, class TP> map;
 #else
-  MapPrivate(const std::map<KeyP, TP>& m) : RefCounterOld(), map(m) {}
+  MapPrivate(const std::map<KeyP, TP>& m) : map(m) {}
   std::map<KeyP, TP> map;
 #endif
 };
 
 template <class Key, class T>
 Map<Key, T>::Map() :
-  d(new MapPrivate<Key, T>())
+  d(std::make_shared<MapPrivate<Key, T>>())
 {
 }
 
 template <class Key, class T>
-Map<Key, T>::Map(const Map<Key, T> &m) : d(m.d)
-{
-  d->ref();
-}
+Map<Key, T>::Map(const Map<Key, T> &) = default;
 
 template <class Key, class T>
-Map<Key, T>::~Map()
-{
-  if(d->deref())
-    delete(d);
-}
+Map<Key, T>::~Map() = default;
 
 template <class Key, class T>
 typename Map<Key, T>::Iterator Map<Key, T>::begin()
@@ -80,6 +70,12 @@ typename Map<Key, T>::ConstIterator Map<Key, T>::begin() const
 }
 
 template <class Key, class T>
+typename Map<Key, T>::ConstIterator Map<Key, T>::cbegin() const
+{
+  return d->map.cbegin();
+}
+
+template <class Key, class T>
 typename Map<Key, T>::Iterator Map<Key, T>::end()
 {
   detach();
@@ -90,6 +86,12 @@ template <class Key, class T>
 typename Map<Key, T>::ConstIterator Map<Key, T>::end() const
 {
   return d->map.end();
+}
+
+template <class Key, class T>
+typename Map<Key, T>::ConstIterator Map<Key, T>::cend() const
+{
+  return d->map.cend();
 }
 
 template <class Key, class T>
@@ -158,7 +160,7 @@ unsigned int Map<Key, T>::size() const
 template <class Key, class T>
 T Map<Key, T>::value(const Key &key, const T &defaultValue) const
 {
-  ConstIterator it = d->map.find(key);
+  auto it = d->map.find(key);
   return it != d->map.end() ? it->second : defaultValue;
 }
 
@@ -176,11 +178,7 @@ T &Map<Key, T>::operator[](const Key &key)
 }
 
 template <class Key, class T>
-Map<Key, T> &Map<Key, T>::operator=(const Map<Key, T> &m)
-{
-  Map<Key, T>(m).swap(*this);
-  return *this;
-}
+Map<Key, T> &Map<Key, T>::operator=(const Map<Key, T> &) = default;
 
 template <class Key, class T>
 void Map<Key, T>::swap(Map<Key, T> &m)
@@ -197,9 +195,8 @@ void Map<Key, T>::swap(Map<Key, T> &m)
 template <class Key, class T>
 void Map<Key, T>::detach()
 {
-  if(d->count() > 1) {
-    d->deref();
-    d = new MapPrivate<Key, T>(d->map);
+  if(d.use_count() > 1) {
+    d = std::make_shared<MapPrivate<Key, T>>(d->map);
   }
 }
 

@@ -9,7 +9,11 @@ package dev.ragnarok.filegallery.util.serializeble.json.internal
 
 import dev.ragnarok.filegallery.util.serializeble.json.DecodeSequenceMode
 import dev.ragnarok.filegallery.util.serializeble.json.Json
-import dev.ragnarok.filegallery.util.serializeble.json.internal.lexer.*
+import dev.ragnarok.filegallery.util.serializeble.json.internal.lexer.AbstractJsonLexer
+import dev.ragnarok.filegallery.util.serializeble.json.internal.lexer.COMMA
+import dev.ragnarok.filegallery.util.serializeble.json.internal.lexer.ReaderJsonLexer
+import dev.ragnarok.filegallery.util.serializeble.json.internal.lexer.TC_BEGIN_LIST
+import dev.ragnarok.filegallery.util.serializeble.json.internal.lexer.TC_END_LIST
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -73,6 +77,7 @@ private class JsonIteratorArrayWrapped<T>(
     private val deserializer: DeserializationStrategy<T>
 ) : Iterator<T> {
     private var first = true
+    private var finished = false
 
     override fun next(): T {
         if (first) {
@@ -88,7 +93,9 @@ private class JsonIteratorArrayWrapped<T>(
      * Note: if array separator (comma) is missing, hasNext() returns true, but next() throws an exception.
      */
     override fun hasNext(): Boolean {
+        if (finished) return false
         if (lexer.peekNextToken() == TC_END_LIST) {
+            finished = true
             lexer.consumeNextToken(TC_END_LIST)
             if (lexer.isNotEof()) {
                 if (lexer.peekNextToken() == TC_BEGIN_LIST) lexer.fail(
@@ -100,7 +107,7 @@ private class JsonIteratorArrayWrapped<T>(
             }
             return false
         }
-        if (!lexer.isNotEof()) lexer.fail(TC_END_LIST)
+        if (!lexer.isNotEof() && !finished) lexer.fail(TC_END_LIST)
         return true
     }
 }

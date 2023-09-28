@@ -22,11 +22,13 @@ import static androidx.annotation.RestrictTo.Scope.LIBRARY_GROUP;
 import static androidx.core.content.ContextCompat.getSystemService;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.ColorStateListDrawable;
 import android.os.Build;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
@@ -48,6 +50,7 @@ import androidx.annotation.RestrictTo;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import com.google.android.material.drawable.DrawableUtils;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -78,6 +81,16 @@ public class ViewUtils {
       }
     }
     getInputMethodManager(view).showSoftInput(view, InputMethodManager.SHOW_IMPLICIT);
+  }
+
+  public static void requestFocusAndShowKeyboard(@NonNull final View view) {
+    requestFocusAndShowKeyboard(view, /* useWindowInsetsController= */ true);
+  }
+
+  public static void requestFocusAndShowKeyboard(
+      @NonNull final View view, boolean useWindowInsetsController) {
+    view.requestFocus();
+    view.post(() -> showKeyboard(view, useWindowInsetsController));
   }
 
   public static void hideKeyboard(@NonNull View view) {
@@ -122,6 +135,26 @@ public class ViewUtils {
   }
 
   @NonNull
+  public static Rect calculateOffsetRectFromBounds(@NonNull View view, @NonNull View offsetView) {
+    int[] offsetViewAbsolutePosition = new int[2];
+    offsetView.getLocationOnScreen(offsetViewAbsolutePosition);
+    int offsetViewAbsoluteLeft = offsetViewAbsolutePosition[0];
+    int offsetViewAbsoluteTop = offsetViewAbsolutePosition[1];
+
+    int[] viewAbsolutePosition = new int[2];
+    view.getLocationOnScreen(viewAbsolutePosition);
+    int viewAbsoluteLeft = viewAbsolutePosition[0];
+    int viewAbsoluteTop = viewAbsolutePosition[1];
+
+    int fromLeft = offsetViewAbsoluteLeft - viewAbsoluteLeft;
+    int fromTop = offsetViewAbsoluteTop - viewAbsoluteTop;
+    int fromRight = fromLeft + offsetView.getWidth();
+    int fromBottom = fromTop + offsetView.getHeight();
+
+    return new Rect(fromLeft, fromTop, fromRight, fromBottom);
+  }
+
+  @NonNull
   public static List<View> getChildren(@Nullable View view) {
     List<View> children = new ArrayList<>();
     if (view instanceof ViewGroup) {
@@ -159,20 +192,6 @@ public class ViewUtils {
   public static float dpToPx(@NonNull Context context, @Dimension(unit = Dimension.DP) int dp) {
     Resources r = context.getResources();
     return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, r.getDisplayMetrics());
-  }
-
-  public static void requestFocusAndShowKeyboard(@NonNull final View view) {
-    view.requestFocus();
-    view.post(
-        new Runnable() {
-          @Override
-          public void run() {
-            InputMethodManager inputMethodManager =
-                (InputMethodManager)
-                    view.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            inputMethodManager.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT);
-          }
-        });
   }
 
   /**
@@ -420,13 +439,22 @@ public class ViewUtils {
   }
 
   /**
-   * Returns the provided view's background color, if it has ColorDrawable as its background, or
-   * {@code null} if the background has a different drawable type.
+   * Returns the color if it can be retrieved from the {@code view}'s background drawable, or null
+   * otherwise.
+   *
+   * <p>In particular:
+   *
+   * <ul>
+   *   <li>If the {@code view}'s background drawable is a {@link ColorDrawable}, the method will
+   *       return the drawable's color.
+   *   <li>If the {@code view}'s background drawable is a {@link ColorStateListDrawable}, the method
+   *       will return the default color of the drawable's {@link ColorStateList}.
+   * </ul>
    */
   @Nullable
   public static Integer getBackgroundColor(@NonNull View view) {
-    return view.getBackground() instanceof ColorDrawable
-        ? ((ColorDrawable) view.getBackground()).getColor()
-        : null;
+    final ColorStateList backgroundColorStateList =
+        DrawableUtils.getColorStateListOrNull(view.getBackground());
+    return backgroundColorStateList != null ? backgroundColorStateList.getDefaultColor() : null;
   }
 }

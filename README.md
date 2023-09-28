@@ -1,5 +1,5 @@
 # Fenrir VK
-# Разработка прекращена
+# Разработка прекращена! Только эксклюзивные обновления
 Первый языческий
 
 <b>Языки: Русский, английский</b>
@@ -9,9 +9,9 @@
 
 <b>Инструкция по сборке:</b>
 Требуется:
-  1) Android Studio Flamingo (2022.2.1) или выше. Kotlin 1.8.*
-  2) Android SDK 33
-  3) Android NDK 25.1.8937393
+  1) Android Studio Hedgehog (2023.1.1) или выше. Kotlin 1.9.*
+  2) Android SDK 34
+  3) Android NDK 26.0.10404224
   
   Если не работает музыка в Fenrir Kate, обновите kate_receipt_gms_token в app.build_config.
   Взять токен можно из Kate Mobile Extra Mod

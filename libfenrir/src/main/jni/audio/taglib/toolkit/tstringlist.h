@@ -26,12 +26,12 @@
 #ifndef TAGLIB_STRINGLIST_H
 #define TAGLIB_STRINGLIST_H
 
+#include <iostream>
+
 #include "tstring.h"
 #include "tlist.h"
 #include "tbytevectorlist.h"
 #include "taglib_export.h"
-
-#include <iostream>
 
 namespace TagLib {
 
@@ -58,23 +58,25 @@ namespace TagLib {
      */
     StringList(const StringList &l);
 
+    StringList &operator=(const StringList &);
+
     /*!
      * Constructs a StringList with \a s as a member.
      */
     StringList(const String &s);
 
     /*!
-     * Makes a deep copy of the data in \a vl.
+     * Makes a deep copy of the data in \a bl.
      *
      * \note This should only be used with the 8-bit codecs Latin1 and UTF8, when
      * used with other codecs it will simply print a warning and exit.
      */
-    StringList(const ByteVectorList &vl, String::Type t = String::Latin1);
+    StringList(const ByteVectorList &bl, String::Type t = String::Latin1);
 
     /*!
      * Destroys this StringList instance.
      */
-    virtual ~StringList();
+    ~StringList();
 
     /*!
      * Concatenate the list of strings into one string separated by \a separator.
@@ -101,7 +103,7 @@ namespace TagLib {
 
   private:
     class StringListPrivate;
-    StringListPrivate *d;
+    std::unique_ptr<StringListPrivate> d;
   };
 
 }  // namespace TagLib

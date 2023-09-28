@@ -1,16 +1,23 @@
 package dev.ragnarok.filegallery.activity.photopager
 
-import android.content.Context
 import android.os.Bundle
+import dev.ragnarok.fenrir.module.parcel.ParcelFlags
 import dev.ragnarok.fenrir.module.parcel.ParcelNative
+import dev.ragnarok.filegallery.fromIOToMain
 import dev.ragnarok.filegallery.model.Photo
+import io.reactivex.rxjava3.core.Single
+import io.reactivex.rxjava3.core.SingleEmitter
 
 class TmpGalleryPagerPresenter(
-    source: Long, index: Int, context: Context?,
+    source: Long, index: Int,
     savedInstanceState: Bundle?
-) : PhotoPagerPresenter(ArrayList(0), context!!, savedInstanceState) {
+) : PhotoPagerPresenter(ArrayList(0), savedInstanceState) {
     override fun close() {
-        view?.returnFileInfo(currentFile)
+        if (mPhotos.isEmpty()) {
+            view?.closeOnly()
+        } else {
+            view?.returnFileInfo(currentFile)
+        }
     }
 
     private fun onInitialLoadingFinished(photos: List<Photo>) {
@@ -22,11 +29,24 @@ class TmpGalleryPagerPresenter(
         refreshInfoViews()
     }
 
+    private fun loadDataFromParcelNative(parcelNative: Long) {
+        changeLoadingNowState(true)
+        appendDisposable(
+            Single.create { v: SingleEmitter<ArrayList<Photo>> ->
+                v.onSuccess(
+                    ParcelNative.loadParcelableArrayList(
+                        parcelNative, Photo.NativeCreator, ParcelFlags.MUTABLE_LIST
+                    ) ?: ArrayList()
+                )
+            }
+                .fromIOToMain()
+                .subscribe({ onInitialLoadingFinished(it) }) {
+                    it.printStackTrace()
+                })
+    }
+
     init {
         currentIndex = index
-        changeLoadingNowState(true)
-        onInitialLoadingFinished(
-            ParcelNative.fromNative(source).readParcelableList(Photo.NativeCreator)!!
-        )
+        loadDataFromParcelNative(source)
     }
 }

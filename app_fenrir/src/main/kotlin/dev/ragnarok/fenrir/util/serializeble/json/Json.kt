@@ -6,12 +6,31 @@ package dev.ragnarok.fenrir.util.serializeble.json
 
 import dev.ragnarok.fenrir.util.serializeble.json.DecodeSequenceMode.ARRAY_WRAPPED
 import dev.ragnarok.fenrir.util.serializeble.json.DecodeSequenceMode.WHITESPACE_SEPARATED
-import dev.ragnarok.fenrir.util.serializeble.json.internal.*
+import dev.ragnarok.fenrir.util.serializeble.json.internal.DescriptorSchemaCache
+import dev.ragnarok.fenrir.util.serializeble.json.internal.FormatLanguage
+import dev.ragnarok.fenrir.util.serializeble.json.internal.JsonDecodingException
+import dev.ragnarok.fenrir.util.serializeble.json.internal.JsonToStringWriter
+import dev.ragnarok.fenrir.util.serializeble.json.internal.PolymorphismValidator
+import dev.ragnarok.fenrir.util.serializeble.json.internal.StreamingJsonDecoder
+import dev.ragnarok.fenrir.util.serializeble.json.internal.WriteMode
+import dev.ragnarok.fenrir.util.serializeble.json.internal.encodeByWriter
 import dev.ragnarok.fenrir.util.serializeble.json.internal.lexer.StringJsonLexer
-import kotlinx.serialization.*
+import dev.ragnarok.fenrir.util.serializeble.json.internal.readJson
+import dev.ragnarok.fenrir.util.serializeble.json.internal.writeJson
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Polymorphic
+import kotlinx.serialization.SerialFormat
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.StringFormat
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.modules.SerializersModule
-import java.io.InputStream
+import kotlinx.serialization.serializer
+import okio.BufferedSource
 
 /**
  * The main entry point to work with JSON serialization.
@@ -87,14 +106,32 @@ sealed class Json(
     }
 
     /**
+     * Decodes and deserializes the given JSON [string] to the value of type [T] using deserializer
+     * retrieved from the reified type parameter.
+     *
+     * @throws SerializationException in case of any decoding-specific error
+     * @throws IllegalArgumentException if the decoded input is not a valid instance of [T]
+     */
+    @OptIn(InternalSerializationApi::class)
+    inline fun <reified T> decodeFromString(
+        @FormatLanguage(
+            "json",
+            "",
+            ""
+        ) string: String
+    ): T =
+        decodeFromString(serializersModule.serializer(), string)
+
+    /**
      * Deserializes the given JSON [string] into a value of type [T] using the given [deserializer].
      *
      * @throws [SerializationException] if the given JSON string is not a valid JSON input for the type [T]
      * @throws [IllegalArgumentException] if the decoded input cannot be represented as a valid instance of type [T]
      */
+    @OptIn(InternalSerializationApi::class)
     final override fun <T> decodeFromString(
         deserializer: DeserializationStrategy<T>,
-        string: String
+        @FormatLanguage("json", "", "") string: String
     ): T {
         val lexer = StringJsonLexer(string)
         val input = StreamingJsonDecoder(this, WriteMode.OBJ, lexer, deserializer.descriptor, null)
@@ -136,8 +173,8 @@ sealed class Json(
         return decodeFromString(JsonElementSerializer, string)
     }
 
-    fun parseToJsonElement(stream: InputStream): JsonElement {
-        return decodeFromStream(JsonElementSerializer, stream)
+    fun parseToJsonElement(source: BufferedSource): JsonElement {
+        return decodeFromBufferedSource(JsonElementSerializer, source)
     }
 
     fun printJsonElement(element: JsonElement): String {
@@ -187,7 +224,7 @@ enum class DecodeSequenceMode {
 
     /**
      * Declares that parser itself should select between [WHITESPACE_SEPARATED] and [ARRAY_WRAPPED] modes.
-     * The selection is performed by looking on the first meaningful character of the stream.
+     * The selection is performed by looking at the first meaningful character of the stream.
      *
      * In most cases, auto-detection is sufficient to correctly parse an input.
      * If the input is _whitespace-separated stream of the arrays_, parser could select an incorrect mode,
@@ -305,7 +342,7 @@ class JsonBuilder internal constructor(json: Json) {
 
     /**
      * Enables coercing incorrect JSON values to the default property value in the following cases:
-     *   1. JSON value is `null` but property type is non-nullable.
+     *   1. JSON value is `null` but the property type is non-nullable.
      *   2. Property type is an enum type, but JSON value contains unknown enum member.
      *
      * `false` by default.
@@ -354,6 +391,35 @@ class JsonBuilder internal constructor(json: Json) {
     var namingStrategy: JsonNamingStrategy? = json.configuration.namingStrategy
 
     /**
+     * Enables decoding enum values in a case-insensitive manner.
+     * Encoding is not affected.
+     *
+     * This affects both enum serial names and alternative names (specified with the [JsonNames] annotation).
+     * In the following example, string `[VALUE_A, VALUE_B]` will be printed:
+     * ```
+     * enum class E { VALUE_A, @JsonNames("ALTERNATIVE") VALUE_B }
+     *
+     * @Serializable
+     * data class Outer(val enums: List<E>)
+     *
+     * val j = Json { decodeEnumsCaseInsensitive = true }
+     * println(j.decodeFromString<Outer>("""{"enums":["value_A", "alternative"]}""").enums)
+     * ```
+     *
+     * If this feature is enabled,
+     * it is no longer possible to decode enum values that have the same name in a lowercase form.
+     * The following code will throw a serialization exception:
+     *
+     * ```
+     * enum class BadEnum { Bad, BAD }
+     * val j = Json { decodeEnumsCaseInsensitive = true }
+     * j.decodeFromString<Box<BadEnum>>("""{"boxed":"bad"}""")
+     * ```
+     */
+    @ExperimentalSerializationApi
+    var decodeEnumsCaseInsensitive: Boolean = json.configuration.decodeEnumsCaseInsensitive
+
+    /**
      * Module with contextual and polymorphic serializers to be used in the resulting [Json] instance.
      *
      * @see SerializersModule
@@ -386,7 +452,7 @@ class JsonBuilder internal constructor(json: Json) {
             allowStructuredMapKeys, prettyPrint, explicitNulls, prettyPrintIndent,
             coerceInputValues, useArrayPolymorphism,
             classDiscriminator, allowSpecialFloatingPointValues, useAlternativeNames,
-            namingStrategy
+            namingStrategy, decodeEnumsCaseInsensitive
         )
     }
 }

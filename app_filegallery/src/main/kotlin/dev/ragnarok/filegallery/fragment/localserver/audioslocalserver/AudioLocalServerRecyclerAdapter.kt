@@ -29,7 +29,6 @@ import dev.ragnarok.filegallery.fromIOToMain
 import dev.ragnarok.filegallery.media.music.MusicPlaybackController
 import dev.ragnarok.filegallery.media.music.PlayerStatus
 import dev.ragnarok.filegallery.modalbottomsheetdialogfragment.ModalBottomSheetDialogFragment
-import dev.ragnarok.filegallery.modalbottomsheetdialogfragment.Option
 import dev.ragnarok.filegallery.modalbottomsheetdialogfragment.OptionRequest
 import dev.ragnarok.filegallery.model.Audio
 import dev.ragnarok.filegallery.model.menu.options.AudioLocalServerOption
@@ -62,7 +61,7 @@ class AudioLocalServerRecyclerAdapter(
     private var mPlayerDisposable = Disposable.disposed()
     private var audioListDisposable = Disposable.disposed()
     private var currAudio: Audio?
-    private val isAudio_round_icon: Boolean = get().main().isAudio_round_icon()
+    private val isAudio_round_icon: Boolean = get().main().isAudio_round_icon
     fun setItems(data: List<Audio>) {
         this.data = data
         notifyDataSetChanged()
@@ -111,7 +110,7 @@ class AudioLocalServerRecyclerAdapter(
     @get:DrawableRes
     private val audioCoverSimple: Int
         get() = if (get().main()
-                .isAudio_round_icon()
+                .isAudio_round_icon
         ) R.drawable.audio_button else R.drawable.audio_button_material
 
     private val transformCover: Transformation by lazy {
@@ -210,160 +209,158 @@ class AudioLocalServerRecyclerAdapter(
         menus.columns(2)
         menus.show(
             (mContext as FragmentActivity).supportFragmentManager,
-            "audio_options",
-            object : ModalBottomSheetDialogFragment.Listener {
-                override fun onModalOptionSelected(option: Option) {
-                    when (option.id) {
-                        AudioLocalServerOption.save_item_audio -> {
-                            audio.downloadIndicator = true
+            "audio_options"
+        ) { _, option ->
+            when (option.id) {
+                AudioLocalServerOption.save_item_audio -> {
+                    audio.downloadIndicator = true
+                    updateDownloadState(holder, audio)
+                    when (doDownloadAudio(mContext, audio, false)) {
+                        0 -> {
+                            createCustomToast(
+                                mContext, view
+                            )?.showToast(R.string.saved_audio)
+                        }
+
+                        1 -> {
+                            CustomSnackbars.createCustomSnackbars(view)
+                                ?.setDurationSnack(BaseTransientBottomBar.LENGTH_LONG)
+                                ?.themedSnack(
+                                    R.string.audio_force_download
+                                )?.setAction(
+                                    R.string.button_yes
+                                ) { doDownloadAudio(mContext, audio, true) }
+                                ?.show()
+                        }
+
+                        else -> {
+                            audio.downloadIndicator = false
                             updateDownloadState(holder, audio)
-                            when (doDownloadAudio(mContext, audio, false)) {
-                                0 -> {
-                                    createCustomToast(
-                                        mContext, view
-                                    )?.showToast(R.string.saved_audio)
-                                }
-
-                                1 -> {
-                                    CustomSnackbars.createCustomSnackbars(view)
-                                        ?.setDurationSnack(BaseTransientBottomBar.LENGTH_LONG)
-                                        ?.themedSnack(
-                                            R.string.audio_force_download
-                                        )?.setAction(
-                                            R.string.button_yes
-                                        ) { doDownloadAudio(mContext, audio, true) }
-                                        ?.show()
-                                }
-
-                                else -> {
-                                    audio.downloadIndicator = false
-                                    updateDownloadState(holder, audio)
-                                    createCustomToast(
-                                        mContext, view
-                                    )?.showToastError(R.string.error_audio)
-                                }
-                            }
+                            createCustomToast(
+                                mContext, view
+                            )?.showToastError(R.string.error_audio)
                         }
-
-                        AudioLocalServerOption.play_item_audio -> if (mClickListener != null) {
-                            mClickListener?.onClick(position, audio)
-                            if (get().main()
-                                    .isShow_mini_player()
-                            ) getPlayerPlace().tryOpenWith(mContext)
-                        }
-
-                        AudioLocalServerOption.play_item_after_current_audio -> MusicPlaybackController.playAfterCurrent(
-                            audio
-                        )
-
-                        AudioLocalServerOption.bitrate_item_audio -> getBitrate(
-                            audio.url,
-                            audio.duration
-                        )
-
-                        AudioLocalServerOption.update_time_item_audio -> {
-                            val hash = parseLocalServerURL(audio.url)
-                            if (hash.isNullOrEmpty()) {
-                                return
-                            }
-                            audioListDisposable = mAudioInteractor.update_time(hash)
-                                .fromIOToMain().subscribe(
-                                    {
-                                        createCustomToast(
-                                            mContext, view
-                                        )?.showToast(R.string.success)
-                                    }) { t: Throwable? ->
-                                    createCustomToast(
-                                        mContext,
-                                        view
-                                    )?.setDuration(Toast.LENGTH_LONG)?.showToastThrowable(t)
-                                }
-                        }
-
-                        AudioLocalServerOption.edit_item_audio -> {
-                            val hash2 = parseLocalServerURL(audio.url)
-                            if (hash2.isNullOrEmpty()) {
-                                return
-                            }
-                            audioListDisposable = mAudioInteractor.get_file_name(hash2)
-                                .fromIOToMain().subscribe(
-                                    { t: String? ->
-                                        val root =
-                                            View.inflate(mContext, R.layout.entry_file_name, null)
-                                        (root.findViewById<View>(R.id.edit_file_name) as TextInputEditText).setText(
-                                            t
-                                        )
-                                        MaterialAlertDialogBuilder(mContext)
-                                            .setTitle(R.string.change_name)
-                                            .setCancelable(true)
-                                            .setView(root)
-                                            .setPositiveButton(R.string.button_ok) { _: DialogInterface?, _: Int ->
-                                                audioListDisposable =
-                                                    mAudioInteractor.update_file_name(
-                                                        hash2,
-                                                        (root.findViewById<View>(R.id.edit_file_name) as TextInputEditText).text.toString()
-                                                            .trim { it <= ' ' })
-                                                        .fromIOToMain()
-                                                        .subscribe({
-                                                            createCustomToast(
-                                                                mContext, view
-                                                            )?.showToast(
-                                                                R.string.success
-                                                            )
-                                                        }) { o: Throwable? ->
-                                                            createCustomToast(
-                                                                mContext,
-                                                                view
-                                                            )?.setDuration(Toast.LENGTH_LONG)
-                                                                ?.showToastThrowable(o)
-                                                        }
-                                            }
-                                            .setNegativeButton(R.string.button_cancel, null)
-                                            .show()
-                                    }) { t: Throwable? ->
-                                    createCustomToast(
-                                        mContext,
-                                        view
-                                    )?.setDuration(Toast.LENGTH_LONG)?.showToastThrowable(t)
-                                }
-                        }
-
-                        AudioLocalServerOption.delete_item_audio -> MaterialAlertDialogBuilder(
-                            mContext
-                        )
-                            .setMessage(R.string.do_delete)
-                            .setTitle(R.string.confirmation)
-                            .setCancelable(true)
-                            .setPositiveButton(R.string.button_yes) { _: DialogInterface?, _: Int ->
-                                val hash1 = parseLocalServerURL(audio.url)
-                                if (hash1.isNullOrEmpty()) {
-                                    return@setPositiveButton
-                                }
-                                audioListDisposable = mAudioInteractor.delete_media(hash1)
-                                    .fromIOToMain().subscribe(
-                                        {
-                                            createCustomToast(
-                                                mContext, view
-                                            )?.showToast(R.string.success)
-                                        }) { o: Throwable? ->
-                                        createCustomToast(
-                                            mContext,
-                                            view
-                                        )?.setDuration(Toast.LENGTH_LONG)?.showToastThrowable(o)
-                                    }
-                            }
-                            .setNegativeButton(R.string.button_cancel, null)
-                            .show()
-
-                        else -> {}
                     }
                 }
-            })
+
+                AudioLocalServerOption.play_item_audio -> if (mClickListener != null) {
+                    mClickListener?.onClick(position, audio)
+                    if (get().main()
+                            .isShow_mini_player
+                    ) getPlayerPlace().tryOpenWith(mContext)
+                }
+
+                AudioLocalServerOption.play_item_after_current_audio -> MusicPlaybackController.playAfterCurrent(
+                    audio
+                )
+
+                AudioLocalServerOption.bitrate_item_audio -> getBitrate(
+                    audio.url,
+                    audio.duration
+                )
+
+                AudioLocalServerOption.update_time_item_audio -> {
+                    val hash = parseLocalServerURL(audio.url)
+                    if (hash.isNullOrEmpty()) {
+                        return@show
+                    }
+                    audioListDisposable = mAudioInteractor.update_time(hash)
+                        .fromIOToMain().subscribe(
+                            {
+                                createCustomToast(
+                                    mContext, view
+                                )?.showToast(R.string.success)
+                            }) { t: Throwable? ->
+                            createCustomToast(
+                                mContext,
+                                view
+                            )?.setDuration(Toast.LENGTH_LONG)?.showToastThrowable(t)
+                        }
+                }
+
+                AudioLocalServerOption.edit_item_audio -> {
+                    val hash2 = parseLocalServerURL(audio.url)
+                    if (hash2.isNullOrEmpty()) {
+                        return@show
+                    }
+                    audioListDisposable = mAudioInteractor.get_file_name(hash2)
+                        .fromIOToMain().subscribe(
+                            { t: String? ->
+                                val root =
+                                    View.inflate(mContext, R.layout.entry_file_name, null)
+                                (root.findViewById<View>(R.id.edit_file_name) as TextInputEditText).setText(
+                                    t
+                                )
+                                MaterialAlertDialogBuilder(mContext)
+                                    .setTitle(R.string.change_name)
+                                    .setCancelable(true)
+                                    .setView(root)
+                                    .setPositiveButton(R.string.button_ok) { _: DialogInterface?, _: Int ->
+                                        audioListDisposable =
+                                            mAudioInteractor.update_file_name(
+                                                hash2,
+                                                (root.findViewById<View>(R.id.edit_file_name) as TextInputEditText).text.toString()
+                                                    .trim { it <= ' ' })
+                                                .fromIOToMain()
+                                                .subscribe({
+                                                    createCustomToast(
+                                                        mContext, view
+                                                    )?.showToast(
+                                                        R.string.success
+                                                    )
+                                                }) { o: Throwable? ->
+                                                    createCustomToast(
+                                                        mContext,
+                                                        view
+                                                    )?.setDuration(Toast.LENGTH_LONG)
+                                                        ?.showToastThrowable(o)
+                                                }
+                                    }
+                                    .setNegativeButton(R.string.button_cancel, null)
+                                    .show()
+                            }) { t: Throwable? ->
+                            createCustomToast(
+                                mContext,
+                                view
+                            )?.setDuration(Toast.LENGTH_LONG)?.showToastThrowable(t)
+                        }
+                }
+
+                AudioLocalServerOption.delete_item_audio -> MaterialAlertDialogBuilder(
+                    mContext
+                )
+                    .setMessage(R.string.do_delete)
+                    .setTitle(R.string.confirmation)
+                    .setCancelable(true)
+                    .setPositiveButton(R.string.button_yes) { _: DialogInterface?, _: Int ->
+                        val hash1 = parseLocalServerURL(audio.url)
+                        if (hash1.isNullOrEmpty()) {
+                            return@setPositiveButton
+                        }
+                        audioListDisposable = mAudioInteractor.delete_media(hash1)
+                            .fromIOToMain().subscribe(
+                                {
+                                    createCustomToast(
+                                        mContext, view
+                                    )?.showToast(R.string.success)
+                                }) { o: Throwable? ->
+                                createCustomToast(
+                                    mContext,
+                                    view
+                                )?.setDuration(Toast.LENGTH_LONG)?.showToastThrowable(o)
+                            }
+                    }
+                    .setNegativeButton(R.string.button_cancel, null)
+                    .show()
+
+                else -> {}
+            }
+        }
     }
 
     private fun doPlay(position: Int, audio: Audio) {
         if (MusicPlaybackController.isNowPlayingOrPreparingOrPaused(audio)) {
-            if (!get().main().isUse_stop_audio()) {
+            if (!get().main().isUse_stop_audio) {
                 MusicPlaybackController.playOrPause()
             } else {
                 MusicPlaybackController.stop()
@@ -414,7 +411,7 @@ class AudioLocalServerRecyclerAdapter(
             holder.play_cover.setImageResource(audioCoverSimple)
         }
         holder.play.setOnClickListener { v: View ->
-            if (get().main().isRevert_play_audio()) {
+            if (get().main().isRevert_play_audio) {
                 doMenu(holder, holder.bindingAdapterPosition, v, audio)
             } else {
                 doPlay(holder.bindingAdapterPosition, audio)
@@ -453,7 +450,7 @@ class AudioLocalServerRecyclerAdapter(
         holder.Track.setOnClickListener { view: View ->
             holder.cancelSelectionAnimation()
             holder.startSomeAnimation()
-            if (get().main().isRevert_play_audio()) {
+            if (get().main().isRevert_play_audio) {
                 doPlay(holder.bindingAdapterPosition, audio)
             } else {
                 doMenu(holder, holder.bindingAdapterPosition, view, audio)

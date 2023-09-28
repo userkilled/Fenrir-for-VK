@@ -16,7 +16,6 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import dev.ragnarok.fenrir.Constants
 import dev.ragnarok.fenrir.Extra
 import dev.ragnarok.fenrir.R
 import dev.ragnarok.fenrir.activity.ActivityFeatures
@@ -103,7 +102,7 @@ class AudiosByArtistFragment : BaseMvpFragment<AudiosByArtistPresenter, IAudiosB
         setupSwipeRefreshLayoutWithCurrentTheme(requireActivity(), mSwipeRefreshLayout)
         val recyclerView: RecyclerView = root.findViewById(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(requireActivity())
-        recyclerView.addOnScrollListener(PicassoPauseOnScrollListener(Constants.PICASSO_TAG))
+        PicassoPauseOnScrollListener.addListener(recyclerView)
         recyclerView.addOnScrollListener(object : EndlessRecyclerOnScrollListener() {
             override fun onScrollToLastElement() {
                 presenter?.fireScrollToEnd()
@@ -113,7 +112,7 @@ class AudiosByArtistFragment : BaseMvpFragment<AudiosByArtistPresenter, IAudiosB
         val save_mode: FloatingActionButton = root.findViewById(R.id.save_mode_button)
         val Goto: FloatingActionButton = root.findViewById(R.id.goto_button)
         save_mode.visibility =
-            if (Settings.get().other().isAudio_save_mode_button) View.VISIBLE else View.GONE
+            if (Settings.get().main().isAudio_save_mode_button) View.VISIBLE else View.GONE
         save_mode.setOnClickListener {
             isSaveMode = !isSaveMode
             Goto.setImageResource(if (isSaveMode) R.drawable.check else R.drawable.audio_player)
@@ -145,7 +144,7 @@ class AudiosByArtistFragment : BaseMvpFragment<AudiosByArtistPresenter, IAudiosB
                 mAudioRecyclerAdapter?.toggleSelectMode(isSaveMode)
                 presenter?.fireUpdateSelectMode()
                 if (tracks.isNotEmpty()) {
-                    CheckDirectory(Settings.get().other().musicDir)
+                    CheckDirectory(Settings.get().main().musicDir)
                     val account_id = presenter?.accountId ?: Settings.get().accounts().current
                     var obj = WorkManager.getInstance(requireActivity()).beginWith(
                         makeDownloadRequestAudio(

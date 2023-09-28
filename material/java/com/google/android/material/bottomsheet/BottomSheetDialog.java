@@ -24,7 +24,6 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
 import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
@@ -50,6 +49,8 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 import com.google.android.material.internal.EdgeToEdgeUtils;
+import com.google.android.material.internal.ViewUtils;
+import com.google.android.material.motion.MaterialBackOrchestrator;
 import com.google.android.material.shape.MaterialShapeDrawable;
 
 /**
@@ -64,6 +65,11 @@ import com.google.android.material.shape.MaterialShapeDrawable;
  * status bar. Padding can be applied automatically to the left, right, or bottom if any of
  * `paddingBottomSystemWindowInsets`, `paddingLeftSystemWindowInsets`, or
  * `paddingRightSystemWindowInsets` are set to true in the style.
+ *
+ * <p>For more information, see the <a
+ * href="https://github.com/material-components/material-components-android/blob/master/docs/components/BottomSheet.md">component
+ * developer guidance</a> and <a
+ * href="https://material.io/components/bottom-sheets/overview">design guidelines</a>.
  */
 public class BottomSheetDialog extends AppCompatDialog {
 
@@ -80,6 +86,7 @@ public class BottomSheetDialog extends AppCompatDialog {
   private boolean canceledOnTouchOutsideSet;
   private EdgeToEdgeCallback edgeToEdgeCallback;
   private boolean edgeToEdgeEnabled;
+  @Nullable private MaterialBackOrchestrator backOrchestrator;
 
   public BottomSheetDialog(@NonNull Context context) {
     this(context, 0);
@@ -161,6 +168,9 @@ public class BottomSheetDialog extends AppCompatDialog {
       if (behavior != null) {
         behavior.setHideable(cancelable);
       }
+      if (getWindow() != null) {
+        updateListeningForBackCallbacks();
+      }
     }
   }
 
@@ -193,12 +203,18 @@ public class BottomSheetDialog extends AppCompatDialog {
         edgeToEdgeCallback.setWindow(window);
       }
     }
+
+    updateListeningForBackCallbacks();
   }
 
   @Override
   public void onDetachedFromWindow() {
     if (edgeToEdgeCallback != null) {
       edgeToEdgeCallback.setWindow(null);
+    }
+
+    if (backOrchestrator != null) {
+      backOrchestrator.stopListeningForBackCallbacks();
     }
   }
 
@@ -283,6 +299,7 @@ public class BottomSheetDialog extends AppCompatDialog {
       behavior = BottomSheetBehavior.from(bottomSheet);
       behavior.addBottomSheetCallback(bottomSheetCallback);
       behavior.setHideable(cancelable);
+      backOrchestrator = new MaterialBackOrchestrator(behavior, bottomSheet);
     }
     return container;
   }
@@ -370,6 +387,17 @@ public class BottomSheetDialog extends AppCompatDialog {
     return container;
   }
 
+  private void updateListeningForBackCallbacks() {
+    if (backOrchestrator == null) {
+      return;
+    }
+    if (cancelable) {
+      backOrchestrator.startListeningForBackCallbacks();
+    } else {
+      backOrchestrator.stopListeningForBackCallbacks();
+    }
+  }
+
   boolean shouldWindowCloseOnTouchOutside() {
     if (!canceledOnTouchOutsideSet) {
       TypedArray a =
@@ -439,12 +467,15 @@ public class BottomSheetDialog extends AppCompatDialog {
       if (backgroundTint != null) {
         // First check for a tint
         lightBottomSheet = isColorLight(backgroundTint.getDefaultColor());
-      } else if (bottomSheet.getBackground() instanceof ColorDrawable) {
-        // Then check for the background color
-        lightBottomSheet = isColorLight(((ColorDrawable) bottomSheet.getBackground()).getColor());
       } else {
-        // Otherwise don't change the status bar color
-        lightBottomSheet = null;
+        Integer backgroundColor = ViewUtils.getBackgroundColor(bottomSheet);
+        if (backgroundColor != null) {
+          // Then check for the background color
+          lightBottomSheet = isColorLight(backgroundColor);
+        } else {
+          // Otherwise don't change the status bar color
+          lightBottomSheet = null;
+        }
       }
     }
 

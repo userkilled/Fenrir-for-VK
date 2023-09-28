@@ -920,7 +920,22 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 defaultValue = false
                 titleRes = R.string.change_upload_size
             }
+            switch("instant_photo_display") {
+                defaultValue = Settings.get().main().isInstant_photo_display
+                titleRes = R.string.instant_photo_display
+            }
 
+            singleChoice(
+                "picasso_dispatcher",
+                selItems(R.array.picasso_dispatcher_names, R.array.picasso_dispatcher_values),
+                parentFragmentManager
+            ) {
+                initialSelection = Settings.get().main().picassoDispatcher.toString()
+                titleRes = R.string.picasso_dispatcher
+                onSelectionChange {
+                    clear_cache()
+                }
+            }
         }
 
         subScreen("input_settings") {
@@ -1002,6 +1017,11 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 onCheckedChange {
                     requireActivity().recreate()
                 }
+            }
+
+            switch("chat_popup_menu") {
+                defaultValue = true
+                titleRes = R.string.chat_popup_menu
             }
 
             switch("expand_voice_transcript") {
@@ -1209,10 +1229,6 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 onCheckedChange {
                     requireActivity().recreate()
                 }
-            }
-
-            switch("ongoing_player_notification") {
-                titleRes = R.string.ongoing_player_notification
             }
 
             switch("force_cache") {
@@ -1668,11 +1684,11 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 selItems(R.array.array_rendering_mode_names, R.array.array_rendering_mode_items),
                 parentFragmentManager
             ) {
-                initialSelection = "2"
+                initialSelection = "0"
                 titleRes = R.string.rendering_mode
                 visible = Utils.hasPie()
                 onSelectionChange { it ->
-                    var sz = 2
+                    var sz = 0
                     try {
                         sz = it.trim { it <= ' ' }.toInt()
                     } catch (ignored: NumberFormatException) {
@@ -1755,10 +1771,20 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 pref("account_cache_cleaner") {
                     titleRes = R.string.account_cache_cleaner
                     onClick {
-                        DBHelper.removeDatabaseFor(requireActivity(), accountId)
-                        cleanCache(requireActivity(), true)
-                        Includes.stores.stickers().clearAccount(accountId).fromIOToMain()
-                            .subscribe(RxUtils.dummy(), RxUtils.ignore())
+                        MaterialAlertDialogBuilder(requireActivity()).setIcon(R.drawable.ic_outline_delete)
+                            .setTitle(R.string.select)
+                            .setMessage(R.string.ask_account_cache_cleaner)
+                            .setPositiveButton(R.string.button_yes) { _: DialogInterface?, _: Int ->
+                                DBHelper.removeDatabaseFor(requireActivity(), accountId)
+                                cleanCache(requireActivity(), true)
+                                Includes.stores.stickers().clearAccount(accountId).fromIOToMain()
+                                    .subscribe(RxUtils.dummy(), RxUtils.ignore())
+                                Includes.stores.tempStore().clearReactionAssets(accountId)
+                                    .fromIOToMain()
+                                    .subscribe(RxUtils.dummy(), RxUtils.ignore())
+                            }
+                            .setNegativeButton(R.string.button_no, null)
+                            .setCancelable(true).show()
                         true
                     }
                 }
@@ -1900,7 +1926,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                                 pref.edit().remove(i).apply()
                             }
 
-                            for (i in Settings.get().other().userNameChangesKeys) {
+                            for (i in Settings.get().main().userNameChangesKeys) {
                                 pref.edit().remove(i).apply()
                             }
                             SettingsBackup.AppPreferencesList().let {
@@ -1942,9 +1968,9 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     val anim: RLottieImageView = view.findViewById(R.id.lottie_animation)
                     val txt: TextView =
                         view.findViewById(dev.ragnarok.fenrir_common.R.id.sub_header)
-                    txt.setText(Common.getAboutUsHeader(Settings.get().other().paganSymbol))
+                    txt.setText(Common.getAboutUsHeader(Settings.get().main().paganSymbol))
                     val cbc = Common.getAboutUsAnimation(
-                        Settings.get().other().paganSymbol,
+                        Settings.get().main().paganSymbol,
                         requireActivity()
                     )
                     if (FenrirNative.isNativeLoaded) {
@@ -2034,7 +2060,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
         }
         val available = Settings.get().pushSettings().registrations
         val can = available.size == 1 && available[0].userId == accountId
-        return if (can) available[0].gmcToken else null
+        return if (can) available[0].fcmToken else null
     }
 
     private val internalDataIntent = registerForActivityResult(
@@ -2088,7 +2114,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
             .setText(UserAgentTool.USER_AGENT_CURRENT_ACCOUNT)
         view.findViewById<TextInputEditText>(R.id.item_device_id)
             .setText(Utils.getDeviceId(requireActivity()))
-        view.findViewById<TextInputEditText>(R.id.item_gcm_token).setText(pushToken())
+        view.findViewById<TextInputEditText>(R.id.item_fcm_token).setText(pushToken())
         view.findViewById<TextInputEditText>(R.id.item_access_token)
             .setText(Settings.get().accounts().currentAccessToken)
         val ot = MaterialAlertDialogBuilder(requireActivity())
@@ -2284,7 +2310,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
     }
 
     private fun initStartPagePreference(): ArrayList<SelectionItem> {
-        val drawerSettings = if (Settings.get().other().is_side_navigation()) Settings.get()
+        val drawerSettings = if (Settings.get().main().is_side_navigation) Settings.get()
             .sideDrawerSettings().categoriesOrder else Settings.get()
             .drawerSettings().categoriesOrder
         val enabledCategoriesName = ArrayList<String>()
@@ -2422,7 +2448,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {}
             })
             val settings = Settings.get()
-                .other().playerCoverBackgroundSettings
+                .main().playerCoverBackgroundSettings
             enabledRotation.isChecked = settings.enabled_rotation
             invertRotation.isChecked = settings.invert_rotation
             fadeSaturation.isChecked = settings.fade_saturation
@@ -2440,7 +2466,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 .setNegativeButton(R.string.button_cancel, null)
                 .setNeutralButton(R.string.set_default) { _: DialogInterface?, _: Int ->
                     Settings.get()
-                        .other().playerCoverBackgroundSettings =
+                        .main().playerCoverBackgroundSettings =
                         PlayerCoverBackgroundSettings().set_default()
                     parentFragmentManager.setFragmentResult(
                         PreferencesExtra.RECREATE_ACTIVITY_REQUEST,
@@ -2457,7 +2483,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     st.rotation_speed = rotationSpeed.progress.toFloat() / 10
                     st.zoom = zoom.progress.toFloat() / 10 + 1f
                     Settings.get()
-                        .other().playerCoverBackgroundSettings = st
+                        .main().playerCoverBackgroundSettings = st
                     parentFragmentManager.setFragmentResult(
                         PreferencesExtra.RECREATE_ACTIVITY_REQUEST,
                         Bundle()
@@ -2481,7 +2507,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 view.findViewById(dev.ragnarok.fenrir_common.R.id.edit_password)
             val enabled: MaterialSwitch =
                 view.findViewById(dev.ragnarok.fenrir_common.R.id.enabled_server)
-            val settings = Settings.get().other().localServer
+            val settings = Settings.get().main().localServer
             url.setText(settings.url)
             password.setText(settings.password)
             enabled.isChecked = settings.enabled
@@ -2519,7 +2545,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     srv.enabled = enabledVal
                     srv.password = passVal
                     srv.url = urlVal
-                    Settings.get().other().localServer = srv
+                    Settings.get().main().localServer = srv
                     Includes.proxySettings.broadcastUpdate(null)
                 }
                 .create()
@@ -2563,8 +2589,12 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     progress: Int,
                     fromUser: Boolean
                 ) {
-                    textVerticalSensitive.text =
-                        getString(R.string.slidr_sensitive, progress)
+                    if (fromUser && progress < 20) {
+                        verticalSensitive.progress = 20
+                        textVerticalSensitive.text = getString(R.string.slidr_sensitive, 20)
+                    } else {
+                        textVerticalSensitive.text = getString(R.string.slidr_sensitive, progress)
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -2577,8 +2607,12 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     progress: Int,
                     fromUser: Boolean
                 ) {
-                    textHorizontalSensitive.text =
-                        getString(R.string.slidr_sensitive, progress)
+                    if (fromUser && progress < 20) {
+                        horizontalSensitive.progress = 20
+                        textHorizontalSensitive.text = getString(R.string.slidr_sensitive, 20)
+                    } else {
+                        textHorizontalSensitive.text = getString(R.string.slidr_sensitive, progress)
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar) {}
@@ -2591,8 +2625,14 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     progress: Int,
                     fromUser: Boolean
                 ) {
-                    textVerticalVelocityThreshold.text =
-                        getString(R.string.slidr_velocity_threshold, progress)
+                    if (fromUser && progress < 4) {
+                        verticalVelocityThreshold.progress = 4
+                        textVerticalVelocityThreshold.text =
+                            getString(R.string.slidr_velocity_threshold, 4)
+                    } else {
+                        textVerticalVelocityThreshold.text =
+                            getString(R.string.slidr_velocity_threshold, progress)
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -2605,8 +2645,14 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     progress: Int,
                     fromUser: Boolean
                 ) {
-                    textHorizontalVelocityThreshold.text =
-                        getString(R.string.slidr_velocity_threshold, progress)
+                    if (fromUser && progress < 4) {
+                        horizontalVelocityThreshold.progress = 4
+                        textHorizontalVelocityThreshold.text =
+                            getString(R.string.slidr_velocity_threshold, 4)
+                    } else {
+                        textHorizontalVelocityThreshold.text =
+                            getString(R.string.slidr_velocity_threshold, progress)
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar) {}
@@ -2619,8 +2665,14 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     progress: Int,
                     fromUser: Boolean
                 ) {
-                    textVerticalDistanceThreshold.text =
-                        getString(R.string.slidr_distance_threshold, progress)
+                    if (fromUser && progress < 4) {
+                        verticalDistanceThreshold.progress = 4
+                        textVerticalDistanceThreshold.text =
+                            getString(R.string.slidr_distance_threshold, 4)
+                    } else {
+                        textVerticalDistanceThreshold.text =
+                            getString(R.string.slidr_distance_threshold, progress)
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -2633,15 +2685,21 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     progress: Int,
                     fromUser: Boolean
                 ) {
-                    textHorizontalDistanceThreshold.text =
-                        getString(R.string.slidr_distance_threshold, progress)
+                    if (fromUser && progress < 4) {
+                        horizontalDistanceThreshold.progress = 4
+                        textHorizontalDistanceThreshold.text =
+                            getString(R.string.slidr_distance_threshold, 4)
+                    } else {
+                        textHorizontalDistanceThreshold.text =
+                            getString(R.string.slidr_distance_threshold, progress)
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar) {}
                 override fun onStopTrackingTouch(seekBar: SeekBar) {}
             })
             val settings = Settings.get()
-                .other().slidrSettings
+                .main().slidrSettings
             verticalSensitive.progress = (settings.vertical_sensitive * 100).toInt()
             horizontalSensitive.progress = (settings.horizontal_sensitive * 100).toInt()
 
@@ -2689,8 +2747,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                 .setNegativeButton(R.string.button_cancel, null)
                 .setNeutralButton(R.string.set_default) { _: DialogInterface?, _: Int ->
                     Settings.get()
-                        .other().slidrSettings =
-                        SlidrSettings().set_default()
+                        .main().slidrSettings = SlidrSettings().set_default()
                     parentFragmentManager.setFragmentResult(
                         PreferencesExtra.RECREATE_ACTIVITY_REQUEST,
                         Bundle()
@@ -2712,7 +2769,7 @@ class PreferencesFragment : AbsPreferencesFragment(), PreferencesAdapter.OnScree
                     st.vertical_distance_threshold =
                         verticalDistanceThreshold.progress.toFloat() / 100
                     Settings.get()
-                        .other().slidrSettings = st
+                        .main().slidrSettings = st
                     parentFragmentManager.setFragmentResult(
                         PreferencesExtra.RECREATE_ACTIVITY_REQUEST,
                         Bundle()

@@ -1,6 +1,10 @@
 package dev.ragnarok.fenrir.api.model.catalog_v2_audio
 
-import dev.ragnarok.fenrir.api.model.*
+import dev.ragnarok.fenrir.api.model.VKApiAudio
+import dev.ragnarok.fenrir.api.model.VKApiAudioPlaylist
+import dev.ragnarok.fenrir.api.model.VKApiCommunity
+import dev.ragnarok.fenrir.api.model.VKApiUser
+import dev.ragnarok.fenrir.api.model.VKApiVideo
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -11,6 +15,9 @@ class VKApiCatalogV2SectionResponse {
 
     @SerialName("playlists")
     var playlists: List<VKApiAudioPlaylist>? = null
+
+    @SerialName("recommended_playlists")
+    var recommended_playlists: List<VKApiCatalogV2RecommendedPlaylist>? = null
 
     @SerialName("artists")
     var artists: List<VKApiCatalogV2ArtistItem>? = null

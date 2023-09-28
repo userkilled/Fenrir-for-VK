@@ -23,10 +23,9 @@
  *   http://www.mozilla.org/MPL/                                           *
  ***************************************************************************/
 
-#include <tdebug.h>
-#include <tstring.h>
-
 #include "mpegproperties.h"
+
+#include "tdebug.h"
 #include "mpegfile.h"
 #include "xingheader.h"
 #include "apetag.h"
@@ -37,35 +36,26 @@ using namespace TagLib;
 class MPEG::Properties::PropertiesPrivate
 {
 public:
-  PropertiesPrivate() :
-    xingHeader(0),
-    length(0),
-    bitrate(0),
-    sampleRate(0),
-    channels(0),
-    layer(0),
-    version(Header::Version1),
-    channelMode(Header::Stereo),
-    protectionEnabled(false),
-    isCopyrighted(false),
-    isOriginal(false) {}
-
+  PropertiesPrivate() = default;
   ~PropertiesPrivate()
   {
     delete xingHeader;
   }
 
-  XingHeader *xingHeader;
-  int length;
-  int bitrate;
-  int sampleRate;
-  int channels;
-  int layer;
-  Header::Version version;
-  Header::ChannelMode channelMode;
-  bool protectionEnabled;
-  bool isCopyrighted;
-  bool isOriginal;
+  PropertiesPrivate(const PropertiesPrivate &) = delete;
+  PropertiesPrivate &operator=(const PropertiesPrivate &) = delete;
+
+  XingHeader *xingHeader { nullptr };
+  int length { 0 };
+  int bitrate { 0 };
+  int sampleRate { 0 };
+  int channels { 0 };
+  int layer { 0 };
+  Header::Version version { Header::Version1 };
+  Header::ChannelMode channelMode { Header::Stereo };
+  bool protectionEnabled { false };
+  bool isCopyrighted { false };
+  bool isOriginal { false };
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -74,25 +64,12 @@ public:
 
 MPEG::Properties::Properties(File *file, ReadStyle style) :
   AudioProperties(style),
-  d(new PropertiesPrivate())
+  d(std::make_unique<PropertiesPrivate>())
 {
   read(file);
 }
 
-MPEG::Properties::~Properties()
-{
-  delete d;
-}
-
-int MPEG::Properties::length() const
-{
-  return lengthInSeconds();
-}
-
-int MPEG::Properties::lengthInSeconds() const
-{
-  return d->length / 1000;
-}
+MPEG::Properties::~Properties() = default;
 
 int MPEG::Properties::lengthInMilliseconds() const
 {
@@ -157,7 +134,7 @@ void MPEG::Properties::read(File *file)
 {
   // Only the first valid frame is required if we have a VBR header.
 
-  const long firstFrameOffset = file->firstFrameOffset();
+  const offset_t firstFrameOffset = file->firstFrameOffset();
   if(firstFrameOffset < 0) {
     debug("MPEG::Properties::read() -- Could not find an MPEG frame in the stream.");
     return;
@@ -172,7 +149,7 @@ void MPEG::Properties::read(File *file)
   d->xingHeader = new XingHeader(file->readBlock(firstHeader.frameLength()));
   if(!d->xingHeader->isValid()) {
     delete d->xingHeader;
-    d->xingHeader = 0;
+    d->xingHeader = nullptr;
   }
 
   if(d->xingHeader && firstHeader.samplesPerFrame() > 0 && firstHeader.sampleRate() > 0) {
@@ -197,14 +174,14 @@ void MPEG::Properties::read(File *file)
 
     // Look for the last MPEG audio frame to calculate the stream length.
 
-    const long lastFrameOffset = file->lastFrameOffset();
+    const offset_t lastFrameOffset = file->lastFrameOffset();
     if(lastFrameOffset < 0) {
       debug("MPEG::Properties::read() -- Could not find an MPEG frame in the stream.");
     }
     else
     {
       const Header lastHeader(file, lastFrameOffset, false);
-      const long streamLength = lastFrameOffset - firstFrameOffset + lastHeader.frameLength();
+      const offset_t streamLength = lastFrameOffset - firstFrameOffset + lastHeader.frameLength();
       if (streamLength > 0)
         d->length = static_cast<int>(streamLength * 8.0 / d->bitrate + 0.5);
     }

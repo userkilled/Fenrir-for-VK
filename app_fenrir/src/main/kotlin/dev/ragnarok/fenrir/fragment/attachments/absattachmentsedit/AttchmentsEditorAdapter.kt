@@ -1,5 +1,6 @@
 package dev.ragnarok.fenrir.fragment.attachments.absattachmentsedit
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.view.View
@@ -22,6 +23,7 @@ import dev.ragnarok.fenrir.model.Graffiti
 import dev.ragnarok.fenrir.model.Link
 import dev.ragnarok.fenrir.model.Market
 import dev.ragnarok.fenrir.model.MarketAlbum
+import dev.ragnarok.fenrir.model.Narratives
 import dev.ragnarok.fenrir.model.Photo
 import dev.ragnarok.fenrir.model.PhotoAlbum
 import dev.ragnarok.fenrir.model.PhotoSize
@@ -153,6 +155,20 @@ class AttchmentsEditorAdapter(
     private fun bindStory(holder: ViewHolder, story: Story) {
         holder.tvTitle.setText(R.string.story)
         val photoLink = story.owner?.maxSquareAvatar
+        if (photoLink.nonNullNoEmpty()) {
+            with()
+                .load(photoLink)
+                .placeholder(R.drawable.background_gray)
+                .into(holder.photoImageView)
+        } else {
+            with().cancelRequest(holder.photoImageView)
+            holder.photoImageView.setImageResource(R.drawable.background_gray)
+        }
+    }
+
+    private fun bindNarrative(holder: ViewHolder, narratives: Narratives) {
+        holder.tvTitle.setText(R.string.narratives)
+        val photoLink = narratives.cover
         if (photoLink.nonNullNoEmpty()) {
             with()
                 .load(photoLink)
@@ -306,11 +322,12 @@ class AttchmentsEditorAdapter(
         holder.photoImageView.setOnClickListener(null)
     }
 
+    @SuppressLint("SetTextI18n")
     private fun bindPoll(holder: ViewHolder, poll: Poll) {
         with()
             .load(R.drawable.background_gray)
             .into(holder.photoImageView)
-        holder.tvTitle.text = poll.question
+        holder.tvTitle.text = context.getString(R.string.poll) + " " + poll.question.orEmpty()
         holder.photoImageView.setOnClickListener(null)
     }
 
@@ -406,6 +423,10 @@ class AttchmentsEditorAdapter(
 
             AbsModelType.MODEL_STORY -> {
                 bindStory(holder, model as Story)
+            }
+
+            AbsModelType.MODEL_NARRATIVE -> {
+                bindNarrative(holder, model as Narratives)
             }
 
             AbsModelType.MODEL_CALL -> {

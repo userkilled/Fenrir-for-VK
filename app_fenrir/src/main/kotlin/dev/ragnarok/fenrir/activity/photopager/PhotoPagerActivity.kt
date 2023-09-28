@@ -24,6 +24,7 @@ import androidx.annotation.LayoutRes
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.MenuProvider
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.doOnPreDraw
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -46,8 +47,6 @@ import dev.ragnarok.fenrir.fragment.base.horizontal.ImageListAdapter
 import dev.ragnarok.fenrir.listener.AppStyleable
 import dev.ragnarok.fenrir.model.*
 import dev.ragnarok.fenrir.module.FenrirNative
-import dev.ragnarok.fenrir.module.parcel.ParcelFlags
-import dev.ragnarok.fenrir.module.parcel.ParcelNative
 import dev.ragnarok.fenrir.picasso.PicassoInstance
 import dev.ragnarok.fenrir.place.Place
 import dev.ragnarok.fenrir.place.PlaceFactory
@@ -125,14 +124,7 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
             args.putInt(Extra.INDEX, position)
             args.putBoolean(Extra.READONLY, readOnly)
             args.putBoolean(Extra.INVERT, invert)
-            if (FenrirNative.isNativeLoaded && Settings.get().other().isNative_parcel_photo) {
-                args.putLong(
-                    EXTRA_PHOTOS,
-                    ParcelNative.createParcelableList(photos, ParcelFlags.NULL_LIST)
-                )
-            } else {
-                args.putParcelableArrayList(EXTRA_PHOTOS, photos)
-            }
+            args.putParcelableArrayList(EXTRA_PHOTOS, photos)
             return args
         }
 
@@ -153,6 +145,7 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
             args.putBoolean(Extra.READONLY, readOnly)
             args.putBoolean(Extra.INVERT, invert)
             args.putLong(EXTRA_PHOTOS, parcelNativePointer)
+            Utils.registerParcelNative(parcelNativePointer)
             return args
         }
 
@@ -209,7 +202,7 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
             Manifest.permission.READ_EXTERNAL_STORAGE
         )
     ) {
-        lazyPresenter { fireWriteExternalStoragePermissionResolved() }
+        lazyPresenter { fireWriteExternalStoragePermissionResolved(this@PhotoPagerActivity) }
     }
 
     private var mViewPager: ViewPager2? = null
@@ -228,7 +221,7 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
     private var mPagerAdapter: Adapter? = null
     private var mCanSaveYourself = false
     private var mCanDelete = false
-    private val bShowPhotosLine = Settings.get().other().isShow_photos_line
+    private val bShowPhotosLine = Settings.get().main().isShow_photos_line
     private val mAdapterRecycler = ImageListAdapter()
 
     @LayoutRes
@@ -294,27 +287,6 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
                 Settings.get().main().viewpager_page_transform
             )
         )
-        mViewPager?.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-            override fun onPageSelected(position: Int) {
-                super.onPageSelected(position)
-                presenter?.firePageSelected(position)
-
-                if (bShowPhotosLine) {
-                    val currentSelected = mAdapterRecycler.getSelectedItem()
-                    if (currentSelected != position) {
-                        mAdapterRecycler.selectPosition(position)
-                        if (currentSelected < position) {
-                            mPreviewsRecycler?.scrollToPosition(position)
-                        } else {
-                            if (position == 0) {
-                                mPreviewsRecycler?.scrollToPosition(position)
-                            } else
-                                mPreviewsRecycler?.scrollToPosition(position)
-                        }
-                    }
-                }
-            }
-        })
         mButtonLike = findViewById(R.id.like_button)
         mButtonLike?.setOnClickListener { presenter?.fireLikeClick() }
         mButtonLike?.setOnLongClickListener {
@@ -324,7 +296,7 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
         mButtonWithUser = findViewById(R.id.with_user_button)
         mButtonWithUser?.setOnClickListener { presenter?.fireWithUserClick() }
         mButtonWithUser?.setOnLongClickListener {
-            presenter?.fireWithUserLongClick()
+            presenter?.fireWithUserLongClick(this)
             true
         }
         mButtonComments = findViewById(R.id.comments_button)
@@ -380,13 +352,13 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
         when (menuItem.itemId) {
             R.id.photo_size -> onPhotoSizeClicked()
             R.id.save_on_drive -> {
-                presenter?.fireSaveOnDriveClick()
+                presenter?.fireSaveOnDriveClick(this)
                 return true
             }
 
             R.id.save_yourself -> presenter?.fireSaveYourselfClick()
             R.id.action_delete -> presenter?.fireDeleteClick()
-            R.id.info -> presenter?.fireInfoButtonClick()
+            R.id.info -> presenter?.fireInfoButtonClick(this)
             R.id.detect_qr -> presenter?.fireDetectQRClick(this)
         }
         return false
@@ -451,7 +423,6 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
                             index,
                             needUpdate,
                             aid,
-                            this@PhotoPagerActivity,
                             saveInstanceState
                         )
                     }
@@ -472,30 +443,58 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
                             source,
                             readOnly,
                             invert,
-                            this@PhotoPagerActivity,
                             saveInstanceState
                         )
                     }
 
-                    Place.VK_PHOTO_ALBUM_GALLERY, Place.VK_PHOTO_ALBUM_GALLERY_NATIVE -> {
+                    Place.VK_PHOTO_ALBUM_GALLERY_NATIVE -> {
+                        val indexx = requireArguments().getInt(Extra.INDEX)
+                        val ownerId = requireArguments().getLong(Extra.OWNER_ID)
+                        val albumId = requireArguments().getInt(Extra.ALBUM_ID)
+                        val readOnly = requireArguments().getBoolean(Extra.READONLY)
+                        val invert = requireArguments().getBoolean(Extra.INVERT)
+                        var nativePointer = requireArguments().getLong(
+                            EXTRA_PHOTOS
+                        )
+                        if (!Utils.isParcelNativeRegistered(nativePointer)) {
+                            nativePointer = 0
+                        }
+                        Utils.unregisterParcelNative(nativePointer)
+                        requireArguments().putLong(EXTRA_PHOTOS, 0)
+                        if (FenrirNative.isNativeLoaded && Settings.get()
+                                .main().isNative_parcel_photo && nativePointer != 0L
+                        ) {
+                            return PhotoAlbumPagerPresenter(
+                                indexx,
+                                aid,
+                                ownerId,
+                                albumId,
+                                nativePointer,
+                                readOnly,
+                                invert,
+                                saveInstanceState
+                            )
+                        }
+                        return PhotoAlbumPagerPresenter(
+                            indexx,
+                            aid,
+                            ownerId,
+                            albumId,
+                            ArrayList(),
+                            readOnly,
+                            invert,
+                            saveInstanceState
+                        )
+                    }
+
+                    Place.VK_PHOTO_ALBUM_GALLERY -> {
                         val indexx = requireArguments().getInt(Extra.INDEX)
                         val ownerId = requireArguments().getLong(Extra.OWNER_ID)
                         val albumId = requireArguments().getInt(Extra.ALBUM_ID)
                         val readOnly = requireArguments().getBoolean(Extra.READONLY)
                         val invert = requireArguments().getBoolean(Extra.INVERT)
                         val photos_album: ArrayList<Photo> =
-                            if (FenrirNative.isNativeLoaded && Settings.get()
-                                    .other().isNative_parcel_photo
-                            ) ParcelNative.loadParcelableArrayList(
-                                requireArguments().getLong(
-                                    EXTRA_PHOTOS
-                                ), Photo.NativeCreator, ParcelFlags.MUTABLE_LIST
-                            )!! else requireArguments().getParcelableArrayListCompat(EXTRA_PHOTOS)!!
-                        if (FenrirNative.isNativeLoaded && Settings.get()
-                                .other().isNative_parcel_photo
-                        ) {
-                            requireArguments().putLong(EXTRA_PHOTOS, 0)
-                        }
+                            requireArguments().getParcelableArrayListCompat(EXTRA_PHOTOS)!!
                         return PhotoAlbumPagerPresenter(
                             indexx,
                             aid,
@@ -504,7 +503,6 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
                             photos_album,
                             readOnly,
                             invert,
-                            this@PhotoPagerActivity,
                             saveInstanceState
                         )
                     }
@@ -517,14 +515,13 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
                             favePhotos,
                             findex,
                             aid,
-                            this@PhotoPagerActivity,
                             saveInstanceState
                         )
                     }
 
                     Place.VK_PHOTO_TMP_SOURCE -> {
                         if (!FenrirNative.isNativeLoaded || !Settings.get()
-                                .other().isNative_parcel_photo
+                                .main().isNative_parcel_photo
                         ) {
                             val source: TmpSource =
                                 requireArguments().getParcelableCompat(Extra.SOURCE)!!
@@ -532,17 +529,19 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
                                 aid,
                                 source,
                                 requireArguments().getInt(Extra.INDEX),
-                                this@PhotoPagerActivity,
                                 saveInstanceState
                             )
                         } else {
-                            val source: Long = requireArguments().getLong(Extra.SOURCE)
+                            var source: Long = requireArguments().getLong(Extra.SOURCE)
                             requireArguments().putLong(Extra.SOURCE, 0)
+                            if (!Utils.isParcelNativeRegistered(source)) {
+                                source = 0
+                            }
+                            Utils.unregisterParcelNative(source)
                             return TmpGalleryPagerPresenter(
                                 aid,
                                 source,
                                 requireArguments().getInt(Extra.INDEX),
-                                this@PhotoPagerActivity,
                                 saveInstanceState
                             )
                         }
@@ -574,6 +573,21 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
         mButtonComments?.count = count
     }
 
+    private val pageChangeListener = object : ViewPager2.OnPageChangeCallback() {
+        override fun onPageSelected(position: Int) {
+            super.onPageSelected(position)
+            presenter?.firePageSelected(position)
+
+            if (bShowPhotosLine && mAdapterRecycler.getSize() > 1) {
+                val currentSelected = mAdapterRecycler.getSelectedItem()
+                if (currentSelected != position) {
+                    mAdapterRecycler.selectPosition(position)
+                    mPreviewsRecycler?.scrollToPosition(position)
+                }
+            }
+        }
+    }
+
     override fun displayPhotos(photos: List<Photo>, initialIndex: Int) {
         if (bShowPhotosLine) {
             if (photos.size <= 1) {
@@ -583,11 +597,14 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
                 mAdapterRecycler.setData(photos)
                 mAdapterRecycler.notifyDataSetChanged()
                 mAdapterRecycler.selectPosition(initialIndex)
+                mPreviewsRecycler?.scrollToPosition(initialIndex)
             }
         }
+        mViewPager?.unregisterOnPageChangeCallback(pageChangeListener)
         mPagerAdapter = Adapter(photos)
         mViewPager?.adapter = mPagerAdapter
         mViewPager?.setCurrentItem(initialIndex, false)
+        mViewPager?.registerOnPageChangeCallback(pageChangeListener)
     }
 
     override fun sharePhoto(accountId: Long, photo: Photo) {
@@ -684,6 +701,10 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
         mToolbar?.visibility = if (visible) View.VISIBLE else View.GONE
     }
 
+    override fun setToolbarTitle(currentIndex: Int, count: Int) {
+        supportActionBar?.title = getString(R.string.image_number, currentIndex, count)
+    }
+
     override fun rebindPhotoAtPartial(position: Int) {
         mPagerAdapter?.notifyItemChanged(position)
     }
@@ -696,8 +717,7 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
     }
 
     override fun closeOnly() {
-        finish()
-        overridePendingTransition(0, 0)
+        Utils.finishActivityImmediate(this)
     }
 
     override fun returnInfo(position: Int, parcelNativePtr: Long) {
@@ -705,8 +725,7 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
             RESULT_OK,
             Intent().putExtra(Extra.PTR, parcelNativePtr).putExtra(Extra.POSITION, position)
         )
-        finish()
-        overridePendingTransition(0, 0)
+        Utils.finishActivityImmediate(this)
     }
 
     override fun returnOnlyPos(position: Int) {
@@ -714,8 +733,7 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
             RESULT_OK,
             Intent().putExtra(Extra.POSITION, position)
         )
-        finish()
-        overridePendingTransition(0, 0)
+        Utils.finishActivityImmediate(this)
     }
 
     override fun hideMenu(hide: Boolean) {}
@@ -727,31 +745,17 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
         val statusbarNonColored = CurrentTheme.getStatusBarNonColored(this)
         val statusbarColored = CurrentTheme.getStatusBarColor(this)
         val w = window
-        w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-        w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         w.statusBarColor = if (colored) statusbarColored else statusbarNonColored
         @ColorInt val navigationColor =
             if (colored) CurrentTheme.getNavigationBarColor(this) else Color.BLACK
         w.navigationBarColor = navigationColor
-        if (Utils.hasMarshmallow()) {
-            var flags = window.decorView.systemUiVisibility
-            flags = if (invertIcons) {
-                flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-            } else {
-                flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-            }
-            window.decorView.systemUiVisibility = flags
-        }
-        if (Utils.hasOreo()) {
-            var flags = window.decorView.systemUiVisibility
-            if (invertIcons) {
-                flags = flags or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-                w.decorView.systemUiVisibility = flags
-                w.navigationBarColor = Color.WHITE
-            } else {
-                flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
-                w.decorView.systemUiVisibility = flags
-            }
+        val ins = WindowInsetsControllerCompat(w, w.decorView)
+        ins.isAppearanceLightStatusBars = invertIcons
+        ins.isAppearanceLightNavigationBars = invertIcons
+
+        if (!Utils.hasMarshmallow()) {
+            w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+            w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         }
     }
 
@@ -981,8 +985,8 @@ class PhotoPagerActivity : BaseMvpActivity<PhotoPagerPresenter, IPhotoPagerView>
                     .inflate(R.layout.content_photo_page, container, false)
             )
             ret.photo.setOnLongClickListener {
-                if (Settings.get().other().isDownload_photo_tap) {
-                    presenter?.fireSaveOnDriveClick()
+                if (Settings.get().main().isDownload_photo_tap) {
+                    presenter?.fireSaveOnDriveClick(this@PhotoPagerActivity)
                 } else if (ret.photo.drawable is Rotatable) {
                     var rot = (ret.photo.drawable as Rotatable).getRotation() + 45
                     if (rot >= 360f) {

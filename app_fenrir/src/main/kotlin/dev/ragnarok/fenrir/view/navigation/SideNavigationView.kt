@@ -118,7 +118,7 @@ class SideNavigationView : AbsNavigationView, MenuListAdapter.ActionListener {
         mDrawerItems?.addAll(generateNavDrawerItems())
         mCompositeDisposable.add(
             Settings.get().sideDrawerSettings()
-                .observeChanges()
+                .observeChanges
                 .observeOn(provideMainThreadScheduler())
                 .subscribe { refreshNavigationItems(it) })
         val inflater = LayoutInflater.from(context)
@@ -161,13 +161,13 @@ class SideNavigationView : AbsNavigationView, MenuListAdapter.ActionListener {
             )
         }
         ivHeaderNotifications.setOnClickListener {
-            val rs = !Settings.get().other().isDisable_notifications
-            Settings.get().other().isDisable_notifications = rs
+            val rs = !Settings.get().main().isDisable_notifications
+            Settings.get().main().isDisable_notifications = rs
             ivHeaderNotifications.setImageResource(if (rs) R.drawable.notification_disable else R.drawable.feed)
         }
         ivHeaderNotifications.setImageResource(
             if (Settings.get()
-                    .other().isDisable_notifications
+                    .main().isDisable_notifications
             ) R.drawable.notification_disable else R.drawable.feed
         )
         ivHeaderDayNight.setOnLongClickListener {
@@ -178,7 +178,7 @@ class SideNavigationView : AbsNavigationView, MenuListAdapter.ActionListener {
             if (Settings.get().ui().nightMode == AppCompatDelegate.MODE_NIGHT_YES || Settings.get()
                     .ui().nightMode == AppCompatDelegate.MODE_NIGHT_AUTO_BATTERY || Settings.get()
                     .ui().nightMode == AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-            ) R.drawable.ic_outline_nights_stay else R.drawable.ic_outline_wb_sunny
+            ) R.drawable.ic_outline_wb_sunny else R.drawable.ic_outline_nights_stay
         )
         mAdapter = MenuListAdapter(context, mDrawerItems ?: mutableListOf(), this, false)
         mAdapter?.addHeader(vHeader)
@@ -258,7 +258,7 @@ class SideNavigationView : AbsNavigationView, MenuListAdapter.ActionListener {
             }
             mDrawerItems?.add(DividerMenuItem())
             if (mRecentChats.nonNullNoEmpty() && Settings.get()
-                    .other().isEnable_show_recent_dialogs
+                    .main().isEnable_show_recent_dialogs
             ) {
                 mRecentChats?.let { mDrawerItems?.addAll(it) }
                 mDrawerItems?.add(DividerMenuItem())
@@ -280,7 +280,7 @@ class SideNavigationView : AbsNavigationView, MenuListAdapter.ActionListener {
             }
         }
         items.add(DividerMenuItem())
-        if (mRecentChats.nonNullNoEmpty() && Settings.get().other().isEnable_show_recent_dialogs) {
+        if (mRecentChats.nonNullNoEmpty() && Settings.get().main().isEnable_show_recent_dialogs) {
             mRecentChats?.let { items.addAll(it) }
             items.add(DividerMenuItem())
         }
@@ -345,7 +345,7 @@ class SideNavigationView : AbsNavigationView, MenuListAdapter.ActionListener {
         tvUserName?.text = user.fullName
         tvUserName?.setTextColor(getVerifiedColor(context, user.isVerified))
         tvDomain?.setTextColor(getVerifiedColor(context, user.isVerified))
-        val donate_anim = Settings.get().other().donate_anim_set
+        val donate_anim = Settings.get().main().donate_anim_set
         if (donate_anim > 0 && user.isDonated) {
             bDonate?.visibility = View.VISIBLE
             bDonate?.setAutoRepeat(true)

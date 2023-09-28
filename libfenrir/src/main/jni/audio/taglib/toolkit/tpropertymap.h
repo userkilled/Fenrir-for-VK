@@ -23,8 +23,8 @@
  *   http://www.mozilla.org/MPL/                                           *
  ***************************************************************************/
 
-#ifndef TAGLIB_PROPERTYMAP_H_
-#define TAGLIB_PROPERTYMAP_H_
+#ifndef TAGLIB_PROPERTYMAP_H
+#define TAGLIB_PROPERTYMAP_H
 
 #include "tmap.h"
 #include "tstringlist.h"
@@ -36,7 +36,7 @@ extern template class TAGLIB_EXPORT TagLib::Map<TagLib::String, TagLib::StringLi
 
 namespace TagLib {
 
-  typedef Map<String,StringList> SimplePropertyMap;
+  using SimplePropertyMap = Map<String, StringList>;
 
   //! A map for format-independent <key,valuelist> tag representations.
 
@@ -118,13 +118,14 @@ namespace TagLib {
   class TAGLIB_EXPORT PropertyMap: public SimplePropertyMap
   {
   public:
-
-    typedef SimplePropertyMap::Iterator Iterator;
-    typedef SimplePropertyMap::ConstIterator ConstIterator;
+    using Iterator = SimplePropertyMap::Iterator;
+    using ConstIterator = SimplePropertyMap::ConstIterator;
 
     PropertyMap();
 
     PropertyMap(const PropertyMap &m);
+
+    PropertyMap &operator=(const PropertyMap &other);
 
     /*!
      * Creates a PropertyMap initialized from a SimplePropertyMap. Copies all
@@ -133,7 +134,7 @@ namespace TagLib {
      */
     PropertyMap(const SimplePropertyMap &m);
 
-    virtual ~PropertyMap();
+    ~PropertyMap();
 
     /*!
      * Inserts \a values under \a key in the map.  If \a key already exists,
@@ -198,7 +199,7 @@ namespace TagLib {
      * If no defaultValue is specified, it returns an empty string list.
      */
     StringList value(const String &key,
-                           const StringList &defaultValue = StringList()) const;
+                     const StringList &defaultValue = StringList()) const;
 
     /*!
      * Returns a reference to the value associated with \a key.
@@ -235,9 +236,11 @@ namespace TagLib {
      * You can remove items from the returned list, which tells TagLib to remove
      * those unsupported elements if you call File::setProperties() with the
      * same PropertyMap as argument.
+     *
+     * \deprecated
      */
+    // TODO: Returning mutable references to internal data structures is a bad idea.
     StringList &unsupportedData();
-    const StringList &unsupportedData() const;
 
     /*!
      * Removes all entries which have an empty value list.
@@ -247,10 +250,9 @@ namespace TagLib {
     String toString() const;
 
   private:
-
-
-    StringList unsupported;
+    class PropertyMapPrivate;
+    std::unique_ptr<PropertyMapPrivate> d;
   };
 
 }  // namespace TagLib
-#endif /* TAGLIB_PROPERTYMAP_H_ */
+#endif /* TAGLIB_PROPERTYMAP_H */

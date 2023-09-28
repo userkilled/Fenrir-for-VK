@@ -65,6 +65,7 @@ import androidx.core.widget.TextViewCompat;
 import androidx.customview.view.AbsSavedState;
 import com.google.android.material.internal.ThemeEnforcement;
 import com.google.android.material.internal.ViewUtils;
+import androidx.resourceinspection.annotation.Attribute;
 import com.google.android.material.resources.MaterialResources;
 import com.google.android.material.shape.MaterialShapeUtils;
 import com.google.android.material.shape.ShapeAppearanceModel;
@@ -111,6 +112,11 @@ import java.util.LinkedHashSet;
  *
  * <p>Specify the radius of all four corners of the button using the {@code app:cornerRadius}
  * attribute.
+ *
+ * <p>For more information, see the <a
+ * href="https://github.com/material-components/material-components-android/blob/master/docs/components/Button.md">component
+ * developer guidance</a> and <a href="https://material.io/components/buttons/overview">design
+ * guidelines</a>.
  */
 public class MaterialButton extends AppCompatButton implements Checkable, Shapeable {
 
@@ -686,6 +692,7 @@ public class MaterialButton extends AppCompatButton implements Checkable, Shapea
    * @attr ref com.google.android.material.R.styleable#MaterialButton_iconPadding
    * @see #setIconPadding(int)
    */
+  @Attribute("com.google.android.material:iconPadding")
   @Px
   public int getIconPadding() {
     return iconPadding;

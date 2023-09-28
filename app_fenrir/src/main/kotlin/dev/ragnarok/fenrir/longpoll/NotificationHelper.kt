@@ -105,7 +105,7 @@ object NotificationHelper {
      */
     @SuppressLint("CheckResult")
     fun notifyNewMessage(context: Context, accountId: Long, message: Message) {
-        if (Settings.get().other().isDisable_notifications) return
+        if (Settings.get().main().isDisable_notifications) return
         ChatEntryFetcher.getRx(context, accountId, accountId)
             .subscribeOn(NotificationScheduler.INSTANCE)
             .subscribe({ account ->
@@ -319,7 +319,7 @@ object NotificationHelper {
     ) {
         val hideBody = Settings.get()
             .security()
-            .needHideMessagesBodyForNotif()
+            .needHideMessagesBodyForNotif
         val text = getMessageContent(hideBody, message, context)
         val nManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager?
@@ -514,7 +514,7 @@ object NotificationHelper {
         var title = pTitle
         val hideBody = Settings.get()
             .security()
-            .needHideMessagesBodyForNotif()
+            .needHideMessagesBodyForNotif
         val text =
             if (hideBody) context.getString(R.string.message_text_is_not_available) else body
         val nManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -529,6 +529,7 @@ object NotificationHelper {
             .setSmallIcon(R.drawable.client_round)
             .setContentText(text)
             .setContentTitle(title)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
         builder.priority = NotificationCompat.PRIORITY_HIGH
         if (!url.isNullOrEmpty()) {
@@ -649,7 +650,7 @@ object NotificationHelper {
         return if (urit != null) Content(MimeType, urit) else null
     }
 
-    @SuppressLint("RestrictedApi")
+    @SuppressLint("RestrictedApi", "ReportShortcutUsage")
     private fun createNotificationShortcut(
         context: Context,
         builder: NotificationCompat.Builder,

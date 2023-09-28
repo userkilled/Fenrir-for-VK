@@ -17,13 +17,24 @@ package com.squareup.picasso3
 
 import android.graphics.Bitmap.createBitmap
 import android.graphics.Matrix
-import android.os.Build.VERSION
+import android.os.Build
 import android.view.Gravity
 import androidx.annotation.VisibleForTesting
-import androidx.exifinterface.media.ExifInterface.*
+import androidx.exifinterface.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL
+import androidx.exifinterface.media.ExifInterface.ORIENTATION_FLIP_VERTICAL
+import androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180
+import androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270
+import androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90
+import androidx.exifinterface.media.ExifInterface.ORIENTATION_TRANSPOSE
+import androidx.exifinterface.media.ExifInterface.ORIENTATION_TRANSVERSE
 import com.squareup.picasso3.BitmapUtils.shouldResize
 import com.squareup.picasso3.RequestHandler.Result.Bitmap
-import kotlin.math.*
+import kotlin.math.ceil
+import kotlin.math.cos
+import kotlin.math.floor
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sin
 
 internal class MatrixTransformation(private val data: Request) : Transformation {
     override fun transform(source: Bitmap): Bitmap {
@@ -102,7 +113,7 @@ internal class MatrixTransformation(private val data: Request) : Transformation 
 
                 // EXIf interpretation should be done before cropping in case the dimensions need to
                 // be recalculated; SDK 28+ uses ImageDecoder which handles EXIF orientation
-                if (exifOrientation != 0 && VERSION.SDK_INT < 28) {
+                if (exifOrientation != 0 && Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
                     val exifRotation = getExifRotation(exifOrientation)
                     val exifTranslation = getExifTranslation(exifOrientation)
                     if (exifRotation != 0) {

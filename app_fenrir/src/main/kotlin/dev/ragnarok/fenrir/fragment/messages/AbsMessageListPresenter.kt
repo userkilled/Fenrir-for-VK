@@ -13,9 +13,11 @@ import dev.ragnarok.fenrir.fragment.base.PlaceSupportPresenter
 import dev.ragnarok.fenrir.fromIOToMain
 import dev.ragnarok.fenrir.media.voice.IVoicePlayer
 import dev.ragnarok.fenrir.media.voice.IVoicePlayer.IPlayerStatusListener
+import dev.ragnarok.fenrir.model.Audio
 import dev.ragnarok.fenrir.model.LastReadId
 import dev.ragnarok.fenrir.model.Message
 import dev.ragnarok.fenrir.model.VoiceMessage
+import dev.ragnarok.fenrir.nonNullNoEmpty
 import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.util.Lookup
 import dev.ragnarok.fenrir.util.Utils
@@ -38,8 +40,26 @@ abstract class AbsMessageListPresenter<V : IBasicMessageListView> internal const
         }
     }
 
-    private fun resolveListView() {
-        view?.displayMessages(data, lastReadId)
+    protected open fun resolveListView() {
+        view?.displayMessages(accountId, data, lastReadId)
+    }
+
+    protected fun indexOf(conversationMessageId: Int, peerId: Long): Int {
+        for (i in data.indices) {
+            if (data[i].conversation_message_id == conversationMessageId && data[i].peerId == peerId) {
+                return i
+            }
+        }
+        return -1
+    }
+
+    protected fun findById(conversationMessageId: Int, peerId: Long): Message? {
+        for (element in data) {
+            if (element.conversation_message_id == conversationMessageId && element.peerId == peerId) {
+                return element
+            }
+        }
+        return null
     }
 
     protected fun indexOf(messageId: Int): Int {
@@ -48,6 +68,13 @@ abstract class AbsMessageListPresenter<V : IBasicMessageListView> internal const
 
     protected fun findById(messageId: Int): Message? {
         return Utils.findById(data, messageId)
+    }
+
+    fun clearSelection(position: Int) {
+        if (position >= 0 && data.size > position) {
+            data[position].isSelected = false
+            safeNotifyItemChanged(position)
+        }
     }
 
     private fun clearSelection(): Boolean {
@@ -61,7 +88,7 @@ abstract class AbsMessageListPresenter<V : IBasicMessageListView> internal const
         return hasChanges
     }
 
-    protected open fun resolveActionMode() {
+    open fun resolveActionMode() {
         val selectionCount = Utils.countOfSelection(data)
         if (selectionCount > 0) {
             view?.showActionMode(
@@ -98,18 +125,24 @@ abstract class AbsMessageListPresenter<V : IBasicMessageListView> internal const
         safeNotifyItemChanged(position)
     }
 
-    fun fireMessageClick(message: Message, position: Int) {
+    fun fireMessageClick(message: Message, position: Int, x: Int?, y: Int?) {
         val actionModeActive = Utils.countOfSelection(data)
         if (actionModeActive > 0) {
             message.isSelected = !message.isSelected
             resolveActionMode()
             safeNotifyItemChanged(position)
         } else {
-            onMessageClick(message)
+            onMessageClick(message, position, x, y)
         }
     }
 
-    protected open fun onMessageClick(message: Message) {}
+    protected open fun onMessageClick(
+        message: Message,
+        position: Int,
+        x: Int?, y: Int?
+    ) {
+    }
+
     fun fireActionModeDestroy() {
         onActionModeDestroy()
     }
@@ -133,6 +166,16 @@ abstract class AbsMessageListPresenter<V : IBasicMessageListView> internal const
     protected open fun onActionModeSpamClick() {}
     fun fireActionModeCopyClick() {
         onActionModeCopyClick()
+    }
+
+    open fun fireReactionModeCopyClick(position: Int) {
+        if (Utils.isHiddenAccount(accountId)) {
+            return
+        }
+        if (position >= 0 && data.size > position) {
+            data[position].setReactionEditMode(!data[position].reactionEditMode)
+            safeNotifyItemChanged(position)
+        }
     }
 
     private fun onActionModeCopyClick() {
@@ -188,7 +231,7 @@ abstract class AbsMessageListPresenter<V : IBasicMessageListView> internal const
             val messageChanged = player.toggle(voiceMessageId, voiceMessage)
             if (messageChanged) {
                 if (!voiceMessage.wasListened()) {
-                    if (!Utils.isHiddenCurrent && Settings.get().other().isMarkListenedVoice) {
+                    if (!Utils.isHiddenCurrent && Settings.get().main().isMarkListenedVoice) {
                         appendDisposable(
                             Repository.messages.markAsListened(accountId, messageId)
                                 .fromIOToMain()
@@ -280,6 +323,48 @@ abstract class AbsMessageListPresenter<V : IBasicMessageListView> internal const
     private fun createVoicePlayer() {
         mVoicePlayer = voicePlayerFactory.createPlayer()
         mVoicePlayer?.setCallback(this)
+    }
+
+    private fun checkForwardedMessageForAudio(
+        toFirst: Boolean,
+        position: Int,
+        audiosList: ArrayList<Audio>,
+        message: Message
+    ): Int {
+        var tmpPosition = position
+        message.attachments?.audios.nonNullNoEmpty {
+            if (toFirst) {
+                tmpPosition += it.size
+                audiosList.addAll(0, it)
+            } else {
+                audiosList.addAll(it)
+            }
+        }
+        message.fwd?.nonNullNoEmpty {
+            for (i in it) {
+                tmpPosition = checkForwardedMessageForAudio(toFirst, position, audiosList, i)
+            }
+        }
+        return tmpPosition
+    }
+
+    fun fireAudioPlayClick(position: Int, audiosList: ArrayList<Audio>, holderPosition: Int?) {
+        if (holderPosition == null) {
+            view?.playAudioList(accountId, position, audiosList)
+            return
+        }
+        var tmpPos = position
+        val comboAudios = ArrayList<Audio>()
+        comboAudios.addAll(audiosList)
+        for (i in (holderPosition + 1)..<data.size.coerceAtMost(100)) {
+            tmpPos = checkForwardedMessageForAudio(true, tmpPos, comboAudios, data[i])
+        }
+        if (holderPosition - 1 >= 0) {
+            for (i in (holderPosition - 1) downTo 0) {
+                tmpPos = checkForwardedMessageForAudio(false, tmpPos, comboAudios, data[i])
+            }
+        }
+        view?.playAudioList(accountId, tmpPos, comboAudios)
     }
 
     init {

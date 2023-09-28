@@ -26,11 +26,11 @@
 #ifndef TAGLIB_FILE_H
 #define TAGLIB_FILE_H
 
+#include "tbytevector.h"
+#include "tiostream.h"
 #include "taglib_export.h"
 #include "taglib.h"
 #include "tag.h"
-#include "tbytevector.h"
-#include "tiostream.h"
 
 namespace TagLib {
 
@@ -66,8 +66,8 @@ namespace TagLib {
      * Specify which tags to strip either explicitly, or on save.
      */
     enum StripTags {
-      StripNone,  //<! Don't strip any tags
-      StripOthers //<! Strip all tags not explicitly referenced in method call
+      StripNone,  //!< Don't strip any tags
+      StripOthers //!< Strip all tags not explicitly referenced in method call
     };
 
     /*!
@@ -75,14 +75,17 @@ namespace TagLib {
      * types should be synchronized.
      */
     enum DuplicateTags {
-      Duplicate,     //<! Synchronize values between different tag types
-      DoNotDuplicate //<! Do not synchronize values between different tag types
+      Duplicate,     //!< Synchronize values between different tag types
+      DoNotDuplicate //!< Do not synchronize values between different tag types
     };
 
     /*!
      * Destroys this File instance.
      */
     virtual ~File();
+
+    File(const File &) = delete;
+    File &operator=(const File &) = delete;
 
     /*!
      * Returns the file name in the local file system encoding.
@@ -105,17 +108,15 @@ namespace TagLib {
      * to remove (a subset of) them.
      * For files that contain more than one tag (e.g. an MP3 with both an ID3v1 and an ID3v2
      * tag) only the most "modern" one will be exported (ID3v2 in this case).
-     * BIC: Will be made virtual in future releases.
      */
-    PropertyMap properties() const;
+    virtual PropertyMap properties() const;
 
     /*!
      * Removes unsupported properties, or a subset of them, from the file's metadata.
      * The parameter \a properties must contain only entries from
      * properties().unsupportedData().
-     * BIC: Will be mad virtual in future releases.
      */
-    void removeUnsupportedProperties(const StringList& properties);
+    virtual void removeUnsupportedProperties(const StringList& properties);
 
     /*!
      * Sets the tags of this File to those specified in \a properties. Calls the
@@ -129,9 +130,8 @@ namespace TagLib {
      * (ID3v2 for MP3 files). Older formats will be updated as well, if they exist, but won't
      * be taken into account for the return value of this function.
      * See the documentation of the subclass implementations for detailed descriptions.
-     * BIC: will become pure virtual in the future
      */
-    PropertyMap setProperties(const PropertyMap &properties);
+    virtual PropertyMap setProperties(const PropertyMap &properties);
 
     /*!
      * Returns a pointer to this file's audio properties.  This should be
@@ -155,7 +155,7 @@ namespace TagLib {
     /*!
      * Reads a block of size \a length at the current get pointer.
      */
-    ByteVector readBlock(unsigned long length);
+    ByteVector readBlock(size_t length);
 
     /*!
      * Attempts to write the block \a data at the current get pointer.  If the
@@ -180,8 +180,8 @@ namespace TagLib {
      * \note This has the practical limitation that \a pattern can not be longer
      * than the buffer size used by readBlock().  Currently this is 1024 bytes.
      */
-    long find(const ByteVector &pattern,
-              long fromOffset = 0,
+    offset_t find(const ByteVector &pattern,
+              offset_t fromOffset = 0,
               const ByteVector &before = ByteVector());
 
     /*!
@@ -196,8 +196,8 @@ namespace TagLib {
      * \note This has the practical limitation that \a pattern can not be longer
      * than the buffer size used by readBlock().  Currently this is 1024 bytes.
      */
-    long rfind(const ByteVector &pattern,
-               long fromOffset = 0,
+    offset_t rfind(const ByteVector &pattern,
+               offset_t fromOffset = 0,
                const ByteVector &before = ByteVector());
 
     /*!
@@ -207,7 +207,7 @@ namespace TagLib {
      * \note This method is slow since it requires rewriting all of the file
      * after the insertion point.
      */
-    void insert(const ByteVector &data, unsigned long start = 0, unsigned long replace = 0);
+    void insert(const ByteVector &data, offset_t start = 0, size_t replace = 0);
 
     /*!
      * Removes a block of the file starting a \a start and continuing for
@@ -216,7 +216,7 @@ namespace TagLib {
      * \note This method is slow since it involves rewriting all of the file
      * after the removed portion.
      */
-    void removeBlock(unsigned long start = 0, unsigned long length = 0);
+    void removeBlock(offset_t start = 0, size_t length = 0);
 
     /*!
      * Returns true if the file is read only (or if the file can not be opened).
@@ -240,7 +240,7 @@ namespace TagLib {
      *
      * \see Position
      */
-    void seek(long offset, Position p = Beginning);
+    void seek(offset_t offset, Position p = Beginning);
 
     /*!
      * Reset the end-of-file and error flags on the file.
@@ -250,27 +250,12 @@ namespace TagLib {
     /*!
      * Returns the current offset within the file.
      */
-    long tell() const;
+    offset_t tell() const;
 
     /*!
      * Returns the length of the file.
      */
-    long length();
-
-    /*!
-     * Returns true if \a file can be opened for reading.  If the file does not
-     * exist, this will return false.
-     *
-     * \deprecated Use system functions, e.g. access() (_access_s() on Windows).
-     */
-    TAGLIB_DEPRECATED static bool isReadable(const char *file);
-
-    /*!
-     * Returns true if \a file can be opened for writing.
-     *
-     * \deprecated Use system functions, e.g. access() (_access_s() on Windows).
-     */
-    TAGLIB_DEPRECATED static bool isWritable(const char *name);
+    offset_t length();
 
   protected:
     /*!
@@ -303,7 +288,7 @@ namespace TagLib {
     /*!
      * Truncates the file to a \a length.
      */
-    void truncate(long length);
+    void truncate(offset_t length);
 
     /*!
      * Returns the buffer size that is used for internal buffering.
@@ -311,11 +296,8 @@ namespace TagLib {
     static unsigned int bufferSize();
 
   private:
-    File(const File &);
-    File &operator=(const File &);
-
     class FilePrivate;
-    FilePrivate *d;
+    std::unique_ptr<FilePrivate> d;
   };
 
 }  // namespace TagLib

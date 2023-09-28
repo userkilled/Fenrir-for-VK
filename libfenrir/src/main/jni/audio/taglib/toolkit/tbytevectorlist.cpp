@@ -27,20 +27,13 @@
 
 using namespace TagLib;
 
-class ByteVectorListPrivate
+class ByteVectorList::ByteVectorListPrivate
 {
-
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // static members
 ////////////////////////////////////////////////////////////////////////////////
-
-ByteVectorList ByteVectorList::split(const ByteVector &v, const ByteVector &pattern,
-                                     int byteAlign)
-{
-  return split(v, pattern, byteAlign, 0);
-}
 
 ByteVectorList ByteVectorList::split(const ByteVector &v, const ByteVector &pattern,
                                      int byteAlign, int max)
@@ -70,31 +63,31 @@ ByteVectorList ByteVectorList::split(const ByteVector &v, const ByteVector &patt
 // public members
 ////////////////////////////////////////////////////////////////////////////////
 
-ByteVectorList::ByteVectorList()
-{
+ByteVectorList::ByteVectorList() = default;
 
+ByteVectorList::~ByteVectorList() = default;
+
+ByteVectorList::ByteVectorList(const ByteVectorList &l) :
+  List<ByteVector>(l)
+{
 }
 
-ByteVectorList::ByteVectorList(const ByteVectorList &l) : List<ByteVector>(l)
+ByteVectorList &ByteVectorList::operator=(const ByteVectorList &l)
 {
+  if(this == &l)
+    return *this;
 
-}
-
-ByteVectorList::~ByteVectorList()
-{
-
+  List<ByteVector>::operator=(l);
+  return *this;
 }
 
 ByteVector ByteVectorList::toByteVector(const ByteVector &separator) const
 {
   ByteVector v;
 
-  ConstIterator it = begin();
-
-  while(it != end()) {
+  for(auto it = begin(); it != end(); ++it) {
     v.append(*it);
-    it++;
-    if(it != end())
+    if(std::next(it) != end())
       v.append(separator);
   }
 

@@ -23,18 +23,16 @@
  *   http://www.mozilla.org/MPL/                                           *
  ***************************************************************************/
 
-#include <taglib_config.h>
+#include "taglib_config.h"
 
 #if !defined(NDEBUG) || defined(TRACE_IN_RELEASE)
+
+#include <bitset>
 
 #include "tdebug.h"
 #include "tstring.h"
 #include "tdebuglistener.h"
 #include "tutils.h"
-
-#include <bitset>
-#include <cstdio>
-#include <cstdarg>
 
 namespace TagLib
 {

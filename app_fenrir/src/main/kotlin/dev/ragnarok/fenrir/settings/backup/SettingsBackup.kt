@@ -32,6 +32,7 @@ class SettingsBackup {
         var notification_bubbles: Boolean? = null
         var messages_menu_down: Boolean? = null
         var expand_voice_transcript: Boolean? = null
+        var chat_popup_menu: Boolean? = null
         var image_size: String? = null
         var start_news: String? = null
         var crypt_version: String? = null
@@ -130,6 +131,8 @@ class SettingsBackup {
         var show_mutual_count: Boolean? = null
         var do_zoom_photo: Boolean? = null
         var change_upload_size: Boolean? = null
+        var instant_photo_display: Boolean? = null
+        var picasso_dispatcher: String? = null
         var show_photos_line: Boolean? = null
         var show_photos_date: Boolean? = null
         var do_auto_play_video: Boolean? = null
@@ -162,10 +165,10 @@ class SettingsBackup {
         var hidden_peers: Set<String>? = null
         var notif_peer_uids: Set<String>? = null
         var user_name_changes_uids: Set<String>? = null
-        var ongoing_player_notification: Boolean? = null
         var owner_changes_monitor_uids: Set<String>? = null
         var current_parser: String? = null
         var audio_catalog_v2_enable: Boolean? = null
+        var remember_local_audio_album: Boolean? = null
         var navigation_menu_order: String? = null
         var side_navigation_menu_order: String? = null
     }
@@ -195,7 +198,7 @@ class SettingsBackup {
             )
         )
         val user_names_pointers = HashMap<String, String>()
-        for ((key) in Settings.get().other().getUserNameChangesMap()) {
+        for ((key) in Settings.get().main().userNameChangesMap) {
             if (pref.contains(key)) {
                 user_names_pointers[key] = pref.getString(key, null) ?: continue
             }
@@ -227,7 +230,7 @@ class SettingsBackup {
             pref.edit().remove(i).apply()
         }
 
-        for (i in Settings.get().other().userNameChangesKeys) {
+        for (i in Settings.get().main().userNameChangesKeys) {
             pref.edit().remove(i).apply()
         }
 
@@ -241,7 +244,7 @@ class SettingsBackup {
 
         Settings.get().security().reloadHiddenDialogSettings()
         Settings.get().notifications().reloadNotifSettings(true)
-        Settings.get().other().reloadOwnerChangesMonitor()
+        Settings.get().main().reloadOwnerChangesMonitor()
 
         ret["notifications_values"]?.let {
             val notificatios_pointers: Map<String, Int> = kJson.decodeFromJsonElement(
@@ -253,7 +256,7 @@ class SettingsBackup {
             }
         }
         Settings.get().notifications().reloadNotifSettings(false)
-        Settings.get().other().reloadUserNameChangesSettings(true)
+        Settings.get().main().reloadUserNameChangesSettings(true)
 
         ret["user_names_values"]?.let {
             val user_names_pointers: Map<String, String> = kJson.decodeFromJsonElement(
@@ -263,7 +266,7 @@ class SettingsBackup {
                 pref.edit().putString(key, value).apply()
             }
         }
-        Settings.get().other().reloadUserNameChangesSettings(false)
+        Settings.get().main().reloadUserNameChangesSettings(false)
 
         ret["shortcuts"]?.let {
             val jp = kJson.decodeFromJsonElement(ListSerializer(ShortcutStored.serializer()), it)

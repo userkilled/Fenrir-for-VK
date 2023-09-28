@@ -18,6 +18,7 @@ import androidx.annotation.IdRes
 import androidx.annotation.LayoutRes
 import androidx.annotation.StringRes
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -38,6 +39,7 @@ import dev.ragnarok.fenrir.listener.AppStyleable
 import dev.ragnarok.fenrir.media.story.IStoryPlayer
 import dev.ragnarok.fenrir.model.PhotoSize
 import dev.ragnarok.fenrir.model.Story
+import dev.ragnarok.fenrir.model.Video
 import dev.ragnarok.fenrir.module.FenrirNative
 import dev.ragnarok.fenrir.module.parcel.ParcelFlags
 import dev.ragnarok.fenrir.module.parcel.ParcelNative
@@ -49,6 +51,7 @@ import dev.ragnarok.fenrir.settings.CurrentTheme
 import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.util.AppPerms.requestPermissionsAbs
 import dev.ragnarok.fenrir.util.AppTextUtils
+import dev.ragnarok.fenrir.util.DownloadWorkUtils
 import dev.ragnarok.fenrir.util.HelperSimple
 import dev.ragnarok.fenrir.util.Utils
 import dev.ragnarok.fenrir.util.ViewUtils
@@ -134,16 +137,6 @@ class StoryPagerActivity : BaseMvpActivity<StoryPagerPresenter, IStoryPagerView>
         } else {
             mHelper?.visibility = View.GONE
         }
-        mViewPager?.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-            override fun onPageSelected(position: Int) {
-                super.onPageSelected(position)
-                playDispose.dispose()
-                playDispose = Observable.just(Object())
-                    .delay(400, TimeUnit.MILLISECONDS)
-                    .toMainThread()
-                    .subscribe { presenter?.firePageSelected(position) }
-            }
-        })
         mDownload = findViewById(R.id.button_download)
         mShare = findViewById(R.id.button_share)
         mShare?.setOnClickListener { presenter?.fireShareButtonClick() }
@@ -188,8 +181,7 @@ class StoryPagerActivity : BaseMvpActivity<StoryPagerPresenter, IStoryPagerView>
                     }
 
                     override fun onSlideClosed(): Boolean {
-                        finish()
-                        overridePendingTransition(0, 0)
+                        Utils.finishActivityImmediate(this@StoryPagerActivity)
                         return true
                     }
 
@@ -218,31 +210,17 @@ class StoryPagerActivity : BaseMvpActivity<StoryPagerPresenter, IStoryPagerView>
         val statusbarNonColored = CurrentTheme.getStatusBarNonColored(this)
         val statusbarColored = CurrentTheme.getStatusBarColor(this)
         val w = window
-        w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-        w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         w.statusBarColor = if (colored) statusbarColored else statusbarNonColored
         @ColorInt val navigationColor =
             if (colored) CurrentTheme.getNavigationBarColor(this) else Color.BLACK
         w.navigationBarColor = navigationColor
-        if (Utils.hasMarshmallow()) {
-            var flags = window.decorView.systemUiVisibility
-            flags = if (invertIcons) {
-                flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-            } else {
-                flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-            }
-            window.decorView.systemUiVisibility = flags
-        }
-        if (Utils.hasOreo()) {
-            var flags = window.decorView.systemUiVisibility
-            if (invertIcons) {
-                flags = flags or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-                w.decorView.systemUiVisibility = flags
-                w.navigationBarColor = Color.WHITE
-            } else {
-                flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
-                w.decorView.systemUiVisibility = flags
-            }
+        val ins = WindowInsetsControllerCompat(w, w.decorView)
+        ins.isAppearanceLightStatusBars = invertIcons
+        ins.isAppearanceLightNavigationBars = invertIcons
+
+        if (!Utils.hasMarshmallow()) {
+            w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+            w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         }
     }
 
@@ -257,6 +235,14 @@ class StoryPagerActivity : BaseMvpActivity<StoryPagerPresenter, IStoryPagerView>
 
     override fun requestWriteExternalStoragePermission() {
         requestWritePermission.launch()
+    }
+
+    override fun downloadPhoto(url: String, dir: String, file: String) {
+        DownloadWorkUtils.doDownloadPhoto(this, url, dir, file)
+    }
+
+    override fun downloadVideo(video: Video, url: String, Res: String) {
+        DownloadWorkUtils.doDownloadVideo(this, video, url, Res)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -291,33 +277,53 @@ class StoryPagerActivity : BaseMvpActivity<StoryPagerPresenter, IStoryPagerView>
             override fun create(): StoryPagerPresenter {
                 val aid = requireArguments().getLong(Extra.ACCOUNT_ID)
                 val index = requireArguments().getInt(Extra.INDEX)
-                val stories: ArrayList<Story> = if (FenrirNative.isNativeLoaded && Settings.get()
-                        .other().isNative_parcel_story
-                ) ParcelNative.loadParcelableArrayList(
-                    requireArguments().getLong(
-                        Extra.STORY
-                    ), Story.NativeCreator, ParcelFlags.EMPTY_LIST
-                )!! else
-                    requireArguments().getParcelableArrayListCompat(Extra.STORY)!!
                 if (FenrirNative.isNativeLoaded && Settings.get()
-                        .other().isNative_parcel_story
+                        .main().isNative_parcel_story
                 ) {
+                    var pointer = requireArguments().getLong(Extra.STORY)
                     requireArguments().putLong(Extra.STORY, 0)
+                    if (!Utils.isParcelNativeRegistered(pointer)) {
+                        pointer = 0
+                    }
+                    Utils.unregisterParcelNative(pointer)
+                    return StoryPagerPresenter(
+                        aid,
+                        ParcelNative.loadParcelableArrayList(
+                            pointer,
+                            Story.NativeCreator,
+                            ParcelFlags.EMPTY_LIST
+                        )!!,
+                        index,
+                        saveInstanceState
+                    )
+                } else {
+                    return StoryPagerPresenter(
+                        aid,
+                        requireArguments().getParcelableArrayListCompat(Extra.STORY)!!,
+                        index,
+                        saveInstanceState
+                    )
                 }
-                return StoryPagerPresenter(
-                    aid,
-                    stories,
-                    index,
-                    this@StoryPagerActivity,
-                    saveInstanceState
-                )
             }
         }
 
+    private val pageChangeListener = object : ViewPager2.OnPageChangeCallback() {
+        override fun onPageSelected(position: Int) {
+            super.onPageSelected(position)
+            playDispose.dispose()
+            playDispose = Observable.just(Object())
+                .delay(400, TimeUnit.MILLISECONDS)
+                .toMainThread()
+                .subscribe { presenter?.firePageSelected(position) }
+        }
+    }
+
     override fun displayData(pageCount: Int, selectedIndex: Int) {
+        mViewPager?.unregisterOnPageChangeCallback(pageChangeListener)
         val adapter = Adapter(pageCount)
         mViewPager?.adapter = adapter
         mViewPager?.setCurrentItem(selectedIndex, false)
+        mViewPager?.registerOnPageChangeCallback(pageChangeListener)
     }
 
     override fun setAspectRatioAt(position: Int, w: Int, h: Int) {
@@ -710,10 +716,12 @@ class StoryPagerActivity : BaseMvpActivity<StoryPagerPresenter, IStoryPagerView>
             val args = Bundle()
             args.putLong(Extra.ACCOUNT_ID, aid)
             args.putInt(Extra.INDEX, index)
-            if (FenrirNative.isNativeLoaded && Settings.get().other().isNative_parcel_story) {
+            if (FenrirNative.isNativeLoaded && Settings.get().main().isNative_parcel_story) {
+                val pointer = ParcelNative.createParcelableList(stories, ParcelFlags.NULL_LIST)
+                Utils.registerParcelNative(pointer)
                 args.putLong(
                     Extra.STORY,
-                    ParcelNative.createParcelableList(stories, ParcelFlags.NULL_LIST)
+                    pointer
                 )
             } else {
                 args.putParcelableArrayList(Extra.STORY, stories)

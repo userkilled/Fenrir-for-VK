@@ -41,7 +41,6 @@ import dev.ragnarok.fenrir.media.music.MusicPlaybackController.playerStatus
 import dev.ragnarok.fenrir.media.music.MusicPlaybackController.stop
 import dev.ragnarok.fenrir.media.music.PlayerStatus
 import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.ModalBottomSheetDialogFragment
-import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.Option
 import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.OptionRequest
 import dev.ragnarok.fenrir.model.Audio
 import dev.ragnarok.fenrir.model.menu.options.AudioOption
@@ -78,6 +77,7 @@ class AudioContainer : LinearLayout {
     private var audioListDisposable = Disposable.disposed()
     private var audios: List<Audio> = emptyList()
     private var currAudio = currentAudio
+    private var holderPosition: Int? = null
     private val isAudio_round_icon: Boolean =
         if (isInEditMode) true else Settings.get().main().isAudio_round_icon
 
@@ -374,304 +374,82 @@ class AudioContainer : LinearLayout {
         menus.columns(2)
         menus.show(
             (context as FragmentActivity).supportFragmentManager,
-            "audio_options",
-            object : ModalBottomSheetDialogFragment.Listener {
-                override fun onModalOptionSelected(option: Option) {
-                    when (option.id) {
-                        AudioOption.play_item_audio -> {
-                            mAttachmentsActionCallback?.onAudioPlay(position, audios)
-                            getPlayerPlace(Settings.get().accounts().current).tryOpenWith(
-                                context
-                            )
-                        }
-
-                        AudioOption.play_item_after_current_audio -> playAfterCurrent(audio)
-                        AudioOption.share_button -> startForSendAttachments(
-                            context,
-                            Settings.get().accounts().current,
-                            audio
-                        )
-
-                        AudioOption.search_by_artist -> getSingleTabSearchPlace(
-                            Settings.get().accounts().current,
-                            SearchContentType.AUDIOS,
-                            AudioSearchCriteria(
-                                audio.artist,
-                                by_artist = true,
-                                in_main_page = false
-                            )
-                        ).tryOpenWith(
-                            context
-                        )
-
-                        AudioOption.get_lyrics_menu -> get_lyrics(audio)
-                        AudioOption.get_recommendation_by_audio -> SearchByAudioPlace(
-                            Settings.get().accounts().current, audio.ownerId, audio.id
-                        ).tryOpenWith(
-                            context
-                        )
-
-                        AudioOption.open_album -> getAudiosInAlbumPlace(
-                            Settings.get().accounts().current,
-                            audio.album_owner_id,
-                            audio.albumId,
-                            audio.album_access_key
-                        ).tryOpenWith(
-                            context
-                        )
-
-                        AudioOption.copy_url -> {
-                            val clipboard =
-                                context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager?
-                            val clip = ClipData.newPlainText("response", audio.url)
-                            clipboard?.setPrimaryClip(clip)
-                            createCustomToast(context).showToast(R.string.copied)
-                        }
-
-                        AudioOption.add_item_audio -> {
-                            val myAudio = audio.ownerId == Settings.get().accounts().current
-                            if (myAudio) {
-                                deleteTrack(Settings.get().accounts().current, audio)
-                            } else {
-                                addTrack(Settings.get().accounts().current, audio)
-                            }
-                        }
-
-                        AudioOption.add_and_download_button -> {
-                            if (audio.ownerId != Settings.get().accounts().current) {
-                                addTrack(Settings.get().accounts().current, audio)
-                            }
-                            if (!hasReadWriteStoragePermission(context)) {
-                                mAttachmentsActionCallback?.onRequestWritePermissions()
-                                return
-                            }
-                            audio.downloadIndicator = 1
-                            updateDownloadState(holder, audio)
-                            val ret = doDownloadAudio(
-                                context,
-                                audio,
-                                Settings.get().accounts().current,
-                                Force = false,
-                                isLocal = false
-                            )
-                            when (ret) {
-                                0 -> createCustomToast(context).showToastBottom(R.string.saved_audio)
-                                1, 2 -> {
-                                    CustomSnackbars.createCustomSnackbars(view)
-                                        ?.setDurationSnack(BaseTransientBottomBar.LENGTH_LONG)
-                                        ?.themedSnack(
-                                            if (ret == 1) R.string.audio_force_download else R.string.audio_force_download_pc
-                                        )
-                                        ?.setAction(
-                                            R.string.button_yes
-                                        ) {
-                                            doDownloadAudio(
-                                                context,
-                                                audio,
-                                                Settings.get().accounts().current,
-                                                Force = true,
-                                                isLocal = false
-                                            )
-                                        }
-                                        ?.show()
-                                }
-
-                                else -> {
-                                    audio.downloadIndicator = 0
-                                    updateDownloadState(holder, audio)
-                                    createCustomToast(context).showToastBottom(R.string.error_audio)
-                                }
-                            }
-                        }
-
-                        AudioOption.save_item_audio -> {
-                            if (!hasReadWriteStoragePermission(context)) {
-                                mAttachmentsActionCallback?.onRequestWritePermissions()
-                                return
-                            }
-                            audio.downloadIndicator = 1
-                            updateDownloadState(holder, audio)
-                            val ret = doDownloadAudio(
-                                context,
-                                audio,
-                                Settings.get().accounts().current,
-                                Force = false,
-                                isLocal = false
-                            )
-                            when (ret) {
-                                0 -> createCustomToast(context).showToastBottom(R.string.saved_audio)
-                                1, 2 -> {
-                                    CustomSnackbars.createCustomSnackbars(view)
-                                        ?.setDurationSnack(BaseTransientBottomBar.LENGTH_LONG)
-                                        ?.themedSnack(
-                                            if (ret == 1) R.string.audio_force_download else R.string.audio_force_download_pc
-                                        )
-                                        ?.setAction(
-                                            R.string.button_yes
-                                        ) {
-                                            doDownloadAudio(
-                                                context,
-                                                audio,
-                                                Settings.get().accounts().current,
-                                                Force = true,
-                                                isLocal = false
-                                            )
-                                        }
-                                        ?.show()
-                                }
-
-                                else -> {
-                                    audio.downloadIndicator = 0
-                                    updateDownloadState(holder, audio)
-                                    createCustomToast(context).showToastBottom(R.string.error_audio)
-                                }
-                            }
-                        }
-
-                        AudioOption.bitrate_item_audio -> getMp3AndBitrate(
-                            Settings.get().accounts().current, audio
-                        )
-
-                        AudioOption.goto_artist -> {
-                            val artists = Utils.getArrayFromHash(audio.main_artists)
-                            if (audio.main_artists?.keys?.size.orZero() > 1) {
-                                MaterialAlertDialogBuilder(context)
-                                    .setItems(artists[1]) { _: DialogInterface?, which: Int ->
-                                        getArtistPlace(
-                                            Settings.get().accounts().current,
-                                            artists[0][which]
-                                        ).tryOpenWith(
-                                            context
-                                        )
-                                    }.show()
-                            } else {
-                                getArtistPlace(
-                                    Settings.get().accounts().current,
-                                    artists[0][0]
-                                ).tryOpenWith(
-                                    context
-                                )
-                            }
-                        }
-                    }
+            "audio_options"
+        ) { _, option ->
+            when (option.id) {
+                AudioOption.play_item_audio -> {
+                    mAttachmentsActionCallback?.onAudioPlay(
+                        position,
+                        audios,
+                        holderPosition
+                    )
+                    getPlayerPlace(Settings.get().accounts().current).tryOpenWith(
+                        context
+                    )
                 }
-            })
-    }
 
-    private fun doPlay(
-        holder: AudioHolder,
-        mAttachmentsActionCallback: OnAttachmentsActionCallback?,
-        position: Int,
-        audio: Audio,
-        audios: ArrayList<Audio>
-    ) {
-        if (isNowPlayingOrPreparingOrPaused(audio)) {
-            if (!Settings.get().other().isUse_stop_audio) {
-                updateAudioStatus(holder, audio)
-                playOrPause()
-            } else {
-                updateAudioStatus(holder, audio)
-                stop()
-            }
-        } else {
-            updateAudioStatus(holder, audio)
-            mAttachmentsActionCallback?.onAudioPlay(position, audios)
-        }
-    }
+                AudioOption.play_item_after_current_audio -> playAfterCurrent(audio)
+                AudioOption.share_button -> startForSendAttachments(
+                    context,
+                    Settings.get().accounts().current,
+                    audio
+                )
 
-    fun displayAudios(
-        audios: ArrayList<Audio>?,
-        mAttachmentsActionCallback: OnAttachmentsActionCallback?
-    ) {
-        if (audios.isNullOrEmpty()) {
-            visibility = View.GONE
-            dispose()
-            return
-        }
-        visibility = View.VISIBLE
-        this.audios = audios
-        val i = audios.size - childCount
-        for (j in 0 until i) {
-            val itemView = LayoutInflater.from(context).inflate(R.layout.item_audio, this, false)
-            val holder = AudioHolder(itemView)
-            itemView.tag = holder
-            addView(itemView)
-        }
-        for (g in 0 until childCount) {
-            val root = getChildAt(g) as ViewGroup? ?: continue
-            if (g < audios.size) {
-                val check = root.tag as AudioHolder? ?: continue
-                val audio = audios[g]
-                check.tvTitle.text = audio.artist
-                check.tvSubtitle.text = audio.title
-                if (!audio.isLocal && !audio.isLocalServer && Constants.DEFAULT_ACCOUNT_TYPE == AccountType.VK_ANDROID && !audio.isHLS) {
-                    check.quality.visibility = VISIBLE
-                    if (audio.isHq) {
-                        check.quality.setImageResource(R.drawable.high_quality)
+                AudioOption.search_by_artist -> getSingleTabSearchPlace(
+                    Settings.get().accounts().current,
+                    SearchContentType.AUDIOS,
+                    AudioSearchCriteria(
+                        audio.artist,
+                        by_artist = true,
+                        in_main_page = false
+                    )
+                ).tryOpenWith(
+                    context
+                )
+
+                AudioOption.get_lyrics_menu -> get_lyrics(audio)
+                AudioOption.get_recommendation_by_audio -> SearchByAudioPlace(
+                    Settings.get().accounts().current, audio.ownerId, audio.id
+                ).tryOpenWith(
+                    context
+                )
+
+                AudioOption.open_album -> getAudiosInAlbumPlace(
+                    Settings.get().accounts().current,
+                    audio.album_owner_id,
+                    audio.albumId,
+                    audio.album_access_key
+                ).tryOpenWith(
+                    context
+                )
+
+                AudioOption.copy_url -> {
+                    val clipboard =
+                        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager?
+                    val clip = ClipData.newPlainText("response", audio.url)
+                    clipboard?.setPrimaryClip(clip)
+                    createCustomToast(context).showToast(R.string.copied)
+                }
+
+                AudioOption.add_item_audio -> {
+                    val myAudio = audio.ownerId == Settings.get().accounts().current
+                    if (myAudio) {
+                        deleteTrack(Settings.get().accounts().current, audio)
                     } else {
-                        check.quality.setImageResource(R.drawable.low_quality)
+                        addTrack(Settings.get().accounts().current, audio)
                     }
-                } else {
-                    check.quality.visibility = GONE
                 }
-                updateAudioStatus(check, audio)
-                if (audio.thumb_image_little.nonNullNoEmpty()) {
-                    with()
-                        .load(audio.thumb_image_little)
-                        .placeholder(
-                            ResourcesCompat.getDrawable(
-                                context.resources, audioCoverSimple, context.theme
-                            ) ?: return
 
-                        )
-                        .transform(transformCover)
-                        .tag(Constants.PICASSO_TAG)
-                        .into(check.play_cover)
-                } else {
-                    with().cancelRequest(check.play_cover)
-                    check.play_cover.setImageResource(audioCoverSimple)
-                }
-                check.ibPlay.setOnLongClickListener {
-                    if (audio.thumb_image_very_big.nonNullNoEmpty()
-                        || audio.thumb_image_big.nonNullNoEmpty() || audio.thumb_image_little.nonNullNoEmpty()
-                    ) {
-                        audio.artist?.let { it1 ->
-                            audio.title?.let { it2 ->
-                                Utils.firstNonEmptyString(
-                                    audio.thumb_image_very_big,
-                                    audio.thumb_image_big, audio.thumb_image_little
-                                )?.let { it3 ->
-                                    mAttachmentsActionCallback?.onUrlPhotoOpen(
-                                        it3, it1, it2
-                                    )
-                                }
-                            }
-                        }
+                AudioOption.add_and_download_button -> {
+                    if (audio.ownerId != Settings.get().accounts().current) {
+                        addTrack(Settings.get().accounts().current, audio)
                     }
-                    true
-                }
-                check.ibPlay.setOnClickListener { v: View ->
-                    if (Settings.get().main().isRevert_play_audio) {
-                        doMenu(check, mAttachmentsActionCallback, g, v, audio, audios)
-                    } else {
-                        doPlay(check, mAttachmentsActionCallback, g, audio, audios)
-                    }
-                }
-                if (audio.duration <= 0) check.time.visibility = INVISIBLE else {
-                    check.time.visibility = VISIBLE
-                    check.time.text = AppTextUtils.getDurationString(audio.duration)
-                }
-                updateDownloadState(check, audio)
-                check.lyric.visibility = if (audio.lyricsId != 0) VISIBLE else GONE
-                check.my.visibility =
-                    if (audio.ownerId == Settings.get().accounts().current) VISIBLE else GONE
-                check.Track.setOnLongClickListener { v: View? ->
                     if (!hasReadWriteStoragePermission(context)) {
                         mAttachmentsActionCallback?.onRequestWritePermissions()
-                        return@setOnLongClickListener false
+                        return@show
                     }
                     audio.downloadIndicator = 1
-                    updateDownloadState(check, audio)
+                    updateDownloadState(holder, audio)
                     val ret = doDownloadAudio(
                         context,
                         audio,
@@ -682,48 +460,277 @@ class AudioContainer : LinearLayout {
                     when (ret) {
                         0 -> createCustomToast(context).showToastBottom(R.string.saved_audio)
                         1, 2 -> {
-                            v?.let {
-                                CustomSnackbars.createCustomSnackbars(it)
-                                    ?.setDurationSnack(BaseTransientBottomBar.LENGTH_LONG)
-                                    ?.themedSnack(
-                                        if (ret == 1) R.string.audio_force_download else R.string.audio_force_download_pc
+                            CustomSnackbars.createCustomSnackbars(view)
+                                ?.setDurationSnack(BaseTransientBottomBar.LENGTH_LONG)
+                                ?.themedSnack(
+                                    if (ret == 1) R.string.audio_force_download else R.string.audio_force_download_pc
+                                )
+                                ?.setAction(
+                                    R.string.button_yes
+                                ) {
+                                    doDownloadAudio(
+                                        context,
+                                        audio,
+                                        Settings.get().accounts().current,
+                                        Force = true,
+                                        isLocal = false
                                     )
-                                    ?.setAction(
-                                        R.string.button_yes
-                                    ) {
-                                        doDownloadAudio(
-                                            context,
-                                            audio,
-                                            Settings.get().accounts().current,
-                                            Force = true,
-                                            isLocal = false
-                                        )
-                                    }
-                                    ?.show()
-                            }
+                                }
+                                ?.show()
                         }
 
                         else -> {
                             audio.downloadIndicator = 0
-                            updateDownloadState(check, audio)
+                            updateDownloadState(holder, audio)
                             createCustomToast(context).showToastBottom(R.string.error_audio)
                         }
                     }
-                    true
                 }
-                check.Track.setOnClickListener { view: View ->
-                    check.cancelSelectionAnimation()
-                    check.startSomeAnimation()
-                    if (Settings.get().main().isRevert_play_audio) {
-                        doPlay(check, mAttachmentsActionCallback, g, audio, audios)
-                    } else {
-                        doMenu(check, mAttachmentsActionCallback, g, view, audio, audios)
+
+                AudioOption.save_item_audio -> {
+                    if (!hasReadWriteStoragePermission(context)) {
+                        mAttachmentsActionCallback?.onRequestWritePermissions()
+                        return@show
+                    }
+                    audio.downloadIndicator = 1
+                    updateDownloadState(holder, audio)
+                    val ret = doDownloadAudio(
+                        context,
+                        audio,
+                        Settings.get().accounts().current,
+                        Force = false,
+                        isLocal = false
+                    )
+                    when (ret) {
+                        0 -> createCustomToast(context).showToastBottom(R.string.saved_audio)
+                        1, 2 -> {
+                            CustomSnackbars.createCustomSnackbars(view)
+                                ?.setDurationSnack(BaseTransientBottomBar.LENGTH_LONG)
+                                ?.themedSnack(
+                                    if (ret == 1) R.string.audio_force_download else R.string.audio_force_download_pc
+                                )
+                                ?.setAction(
+                                    R.string.button_yes
+                                ) {
+                                    doDownloadAudio(
+                                        context,
+                                        audio,
+                                        Settings.get().accounts().current,
+                                        Force = true,
+                                        isLocal = false
+                                    )
+                                }
+                                ?.show()
+                        }
+
+                        else -> {
+                            audio.downloadIndicator = 0
+                            updateDownloadState(holder, audio)
+                            createCustomToast(context).showToastBottom(R.string.error_audio)
+                        }
                     }
                 }
-                root.visibility = VISIBLE
-            } else {
-                root.visibility = GONE
+
+                AudioOption.bitrate_item_audio -> getMp3AndBitrate(
+                    Settings.get().accounts().current, audio
+                )
+
+                AudioOption.goto_artist -> {
+                    val artists = Utils.getArrayFromHash(audio.main_artists)
+                    if (audio.main_artists?.keys?.size.orZero() > 1) {
+                        MaterialAlertDialogBuilder(context)
+                            .setItems(artists[1]) { _: DialogInterface?, which: Int ->
+                                getArtistPlace(
+                                    Settings.get().accounts().current,
+                                    artists[0][which]
+                                ).tryOpenWith(
+                                    context
+                                )
+                            }.show()
+                    } else {
+                        getArtistPlace(
+                            Settings.get().accounts().current,
+                            artists[0][0]
+                        ).tryOpenWith(
+                            context
+                        )
+                    }
+                }
             }
+        }
+    }
+
+    private fun doPlay(
+        holder: AudioHolder,
+        mAttachmentsActionCallback: OnAttachmentsActionCallback?,
+        position: Int,
+        audio: Audio,
+        audios: ArrayList<Audio>
+    ) {
+        if (isNowPlayingOrPreparingOrPaused(audio)) {
+            if (!Settings.get().main().isUse_stop_audio) {
+                updateAudioStatus(holder, audio)
+                playOrPause()
+            } else {
+                updateAudioStatus(holder, audio)
+                stop()
+            }
+        } else {
+            updateAudioStatus(holder, audio)
+            mAttachmentsActionCallback?.onAudioPlay(position, audios, holderPosition)
+        }
+    }
+
+    fun displayAudios(
+        audios: ArrayList<Audio>?,
+        mAttachmentsActionCallback: OnAttachmentsActionCallback?,
+        holderPosition: Int?
+    ) {
+        if (audios.isNullOrEmpty()) {
+            dispose()
+
+            if (childCount > 0) {
+                removeAllViews()
+            }
+            visibility = View.GONE
+            return
+        }
+        visibility = View.VISIBLE
+        this.audios = audios
+        this.holderPosition = holderPosition
+        val i = audios.size - childCount
+        for (j in 0 until i) {
+            val itemView = LayoutInflater.from(context).inflate(R.layout.item_audio, this, false)
+            val holder = AudioHolder(itemView)
+            itemView.tag = holder
+            addView(itemView)
+        }
+        if (childCount > audios.size) {
+            removeViews(audios.size, childCount - audios.size)
+        }
+        for (g in audios.indices) {
+            val root = getChildAt(g) as ViewGroup? ?: continue
+            val check = root.tag as AudioHolder? ?: continue
+            val audio = audios[g]
+            check.tvTitle.text = audio.artist
+            check.tvSubtitle.text = audio.title
+            if (!audio.isLocal && !audio.isLocalServer && Constants.DEFAULT_ACCOUNT_TYPE == AccountType.VK_ANDROID && !audio.isHLS) {
+                check.quality.visibility = VISIBLE
+                if (audio.isHq) {
+                    check.quality.setImageResource(R.drawable.high_quality)
+                } else {
+                    check.quality.setImageResource(R.drawable.low_quality)
+                }
+            } else {
+                check.quality.visibility = GONE
+            }
+            updateAudioStatus(check, audio)
+            if (audio.thumb_image_little.nonNullNoEmpty()) {
+                with()
+                    .load(audio.thumb_image_little)
+                    .placeholder(
+                        ResourcesCompat.getDrawable(
+                            context.resources, audioCoverSimple, context.theme
+                        ) ?: return
+
+                    )
+                    .transform(transformCover)
+                    .tag(Constants.PICASSO_TAG)
+                    .into(check.play_cover)
+            } else {
+                with().cancelRequest(check.play_cover)
+                check.play_cover.setImageResource(audioCoverSimple)
+            }
+            check.ibPlay.setOnLongClickListener {
+                if (audio.thumb_image_very_big.nonNullNoEmpty()
+                    || audio.thumb_image_big.nonNullNoEmpty() || audio.thumb_image_little.nonNullNoEmpty()
+                ) {
+                    audio.artist?.let { it1 ->
+                        audio.title?.let { it2 ->
+                            Utils.firstNonEmptyString(
+                                audio.thumb_image_very_big,
+                                audio.thumb_image_big, audio.thumb_image_little
+                            )?.let { it3 ->
+                                mAttachmentsActionCallback?.onUrlPhotoOpen(
+                                    it3, it1, it2
+                                )
+                            }
+                        }
+                    }
+                }
+                true
+            }
+            check.ibPlay.setOnClickListener { v: View ->
+                if (Settings.get().main().isRevert_play_audio) {
+                    doMenu(check, mAttachmentsActionCallback, g, v, audio, audios)
+                } else {
+                    doPlay(check, mAttachmentsActionCallback, g, audio, audios)
+                }
+            }
+            if (audio.duration <= 0) check.time.visibility = INVISIBLE else {
+                check.time.visibility = VISIBLE
+                check.time.text = AppTextUtils.getDurationString(audio.duration)
+            }
+            updateDownloadState(check, audio)
+            check.lyric.visibility = if (audio.lyricsId != 0) VISIBLE else GONE
+            check.my.visibility =
+                if (audio.ownerId == Settings.get().accounts().current) VISIBLE else GONE
+            check.Track.setOnLongClickListener { v: View? ->
+                if (!hasReadWriteStoragePermission(context)) {
+                    mAttachmentsActionCallback?.onRequestWritePermissions()
+                    return@setOnLongClickListener false
+                }
+                audio.downloadIndicator = 1
+                updateDownloadState(check, audio)
+                val ret = doDownloadAudio(
+                    context,
+                    audio,
+                    Settings.get().accounts().current,
+                    Force = false,
+                    isLocal = false
+                )
+                when (ret) {
+                    0 -> createCustomToast(context).showToastBottom(R.string.saved_audio)
+                    1, 2 -> {
+                        v?.let {
+                            CustomSnackbars.createCustomSnackbars(it)
+                                ?.setDurationSnack(BaseTransientBottomBar.LENGTH_LONG)
+                                ?.themedSnack(
+                                    if (ret == 1) R.string.audio_force_download else R.string.audio_force_download_pc
+                                )
+                                ?.setAction(
+                                    R.string.button_yes
+                                ) {
+                                    doDownloadAudio(
+                                        context,
+                                        audio,
+                                        Settings.get().accounts().current,
+                                        Force = true,
+                                        isLocal = false
+                                    )
+                                }
+                                ?.show()
+                        }
+                    }
+
+                    else -> {
+                        audio.downloadIndicator = 0
+                        updateDownloadState(check, audio)
+                        createCustomToast(context).showToastBottom(R.string.error_audio)
+                    }
+                }
+                true
+            }
+            check.Track.setOnClickListener { view: View ->
+                check.cancelSelectionAnimation()
+                check.startSomeAnimation()
+                if (Settings.get().main().isRevert_play_audio) {
+                    doPlay(check, mAttachmentsActionCallback, g, audio, audios)
+                } else {
+                    doMenu(check, mAttachmentsActionCallback, g, view, audio, audios)
+                }
+            }
+            root.visibility = VISIBLE
         }
         mPlayerDisposable.dispose()
         mPlayerDisposable = observeServiceBinding()

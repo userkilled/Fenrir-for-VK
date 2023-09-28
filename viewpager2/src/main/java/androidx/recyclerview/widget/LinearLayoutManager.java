@@ -31,9 +31,9 @@ import android.view.accessibility.AccessibilityEvent;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.view.ViewCompat;
+import androidx.tracing.Trace;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat;
-import androidx.tracing.Trace;
 
 import java.util.List;
 
@@ -370,6 +370,11 @@ public class LinearLayoutManager extends RecyclerView.LayoutManager implements
     @Override
     public boolean canScrollVertically() {
         return mOrientation == VERTICAL;
+    }
+
+    @Override
+    public boolean isLayoutReversed() {
+        return mReverseLayout;
     }
 
     /**
@@ -2119,7 +2124,7 @@ public class LinearLayoutManager extends RecyclerView.LayoutManager implements
 
     View findOnePartiallyOrCompletelyInvisibleChild(int fromIndex, int toIndex) {
         ensureLayoutState();
-        final int next = Integer.compare(toIndex, fromIndex);
+        final int next = toIndex > fromIndex ? 1 : (toIndex < fromIndex ? -1 : 0);
         if (next == 0) {
             return getChildAt(fromIndex);
         }

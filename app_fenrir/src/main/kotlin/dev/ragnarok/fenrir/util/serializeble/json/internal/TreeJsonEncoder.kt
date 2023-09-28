@@ -5,11 +5,25 @@
 
 package dev.ragnarok.fenrir.util.serializeble.json.internal
 
-import dev.ragnarok.fenrir.util.serializeble.json.*
+import dev.ragnarok.fenrir.util.serializeble.json.Json
+import dev.ragnarok.fenrir.util.serializeble.json.JsonArray
+import dev.ragnarok.fenrir.util.serializeble.json.JsonArraySerializer
+import dev.ragnarok.fenrir.util.serializeble.json.JsonElement
+import dev.ragnarok.fenrir.util.serializeble.json.JsonElementSerializer
+import dev.ragnarok.fenrir.util.serializeble.json.JsonEncoder
+import dev.ragnarok.fenrir.util.serializeble.json.JsonLiteral
+import dev.ragnarok.fenrir.util.serializeble.json.JsonNull
+import dev.ragnarok.fenrir.util.serializeble.json.JsonObject
+import dev.ragnarok.fenrir.util.serializeble.json.JsonObjectSerializer
+import dev.ragnarok.fenrir.util.serializeble.json.JsonPrimitive
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.SerializationStrategy
-import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.descriptors.PolymorphicKind
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.encoding.AbstractEncoder
 import kotlinx.serialization.encoding.CompositeEncoder
 import kotlinx.serialization.encoding.Encoder
@@ -29,7 +43,7 @@ fun <T> Json.writeJson(value: T, serializer: SerializationStrategy<T>): JsonElem
 @ExperimentalSerializationApi
 private sealed class AbstractJsonTreeEncoder(
     final override val json: Json,
-    private val nodeConsumer: (JsonElement) -> Unit
+    protected val nodeConsumer: (JsonElement) -> Unit
 ) : NamedValueEncoder(), JsonEncoder {
 
     final override val serializersModule: SerializersModule
@@ -86,7 +100,6 @@ private sealed class AbstractJsonTreeEncoder(
             encodePolymorphically(serializer, value) { polymorphicDiscriminator = it }
         } else JsonPrimitiveEncoder(json, nodeConsumer).apply {
             encodeSerializableValue(serializer, value)
-            endEncode(serializer.descriptor)
         }
     }
 
@@ -127,6 +140,11 @@ private sealed class AbstractJsonTreeEncoder(
 
             else -> super.encodeTaggedInline(tag, inlineDescriptor)
         }
+
+    override fun encodeInline(descriptor: SerialDescriptor): Encoder {
+        return if (currentTagOrNull != null) super.encodeInline(descriptor)
+        else JsonPrimitiveEncoder(json, nodeConsumer).encodeInline(descriptor)
+    }
 
     @SuppressAnimalSniffer // Long(Integer).toUnsignedString(long)
     private fun inlineUnsignedNumberEncoder(tag: String) = object : AbstractEncoder() {
@@ -197,6 +215,7 @@ private class JsonPrimitiveEncoder(
         require(key === PRIMITIVE_TAG) { "This output can only consume primitives with '$PRIMITIVE_TAG' tag" }
         require(content == null) { "Primitive element was already recorded. Does call to .encodeXxx happen more than once?" }
         content = element
+        nodeConsumer(element)
     }
 
     override fun getCurrent(): JsonElement =

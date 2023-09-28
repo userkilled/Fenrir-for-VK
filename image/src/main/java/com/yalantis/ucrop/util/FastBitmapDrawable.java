@@ -22,6 +22,8 @@ import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
 
+import androidx.annotation.NonNull;
+
 public class FastBitmapDrawable extends Drawable {
 
     private final Paint mPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
@@ -36,7 +38,7 @@ public class FastBitmapDrawable extends Drawable {
     }
 
     @Override
-    public void draw(Canvas canvas) {
+    public void draw(@NonNull Canvas canvas) {
         if (mBitmap != null && !mBitmap.isRecycled()) {
             canvas.drawBitmap(mBitmap, null, getBounds(), mPaint);
         }
@@ -47,15 +49,18 @@ public class FastBitmapDrawable extends Drawable {
         mPaint.setColorFilter(cf);
     }
 
+    @Deprecated
     @Override
     public int getOpacity() {
         return PixelFormat.TRANSLUCENT;
     }
 
+    @Override
     public void setFilterBitmap(boolean filterBitmap) {
         mPaint.setFilterBitmap(filterBitmap);
     }
 
+    @Override
     public int getAlpha() {
         return mAlpha;
     }

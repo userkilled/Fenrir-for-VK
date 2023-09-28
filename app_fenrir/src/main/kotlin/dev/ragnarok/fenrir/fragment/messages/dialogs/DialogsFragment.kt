@@ -7,7 +7,12 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.text.InputType
-import android.view.*
+import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -41,7 +46,6 @@ import dev.ragnarok.fenrir.listener.EndlessRecyclerOnScrollListener
 import dev.ragnarok.fenrir.listener.OnSectionResumeCallback
 import dev.ragnarok.fenrir.listener.PicassoPauseOnScrollListener
 import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.ModalBottomSheetDialogFragment
-import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.Option
 import dev.ragnarok.fenrir.modalbottomsheetdialogfragment.OptionRequest
 import dev.ragnarok.fenrir.model.Dialog
 import dev.ragnarok.fenrir.model.Owner
@@ -55,10 +59,14 @@ import dev.ragnarok.fenrir.place.PlaceFactory.getSingleTabSearchPlace
 import dev.ragnarok.fenrir.place.PlaceFactory.securitySettingsPlace
 import dev.ragnarok.fenrir.settings.ISettings.INotificationSettings
 import dev.ragnarok.fenrir.settings.Settings
-import dev.ragnarok.fenrir.util.*
+import dev.ragnarok.fenrir.util.AppPerms
 import dev.ragnarok.fenrir.util.AppPerms.requestPermissionsAbs
+import dev.ragnarok.fenrir.util.HelperSimple
 import dev.ragnarok.fenrir.util.HelperSimple.NOTIFICATION_PERMISSION
 import dev.ragnarok.fenrir.util.HelperSimple.needHelp
+import dev.ragnarok.fenrir.util.InputTextDialog
+import dev.ragnarok.fenrir.util.MessagesReplyItemCallback
+import dev.ragnarok.fenrir.util.Utils
 import dev.ragnarok.fenrir.util.Utils.addFlagIf
 import dev.ragnarok.fenrir.util.Utils.hasFlag
 import dev.ragnarok.fenrir.util.Utils.hasOreo
@@ -92,7 +100,7 @@ class DialogsFragment : BaseMvpFragment<DialogsPresenter, IDialogsView>(), IDial
     ) { result: ActivityResult ->
         if (result.resultCode == Activity.RESULT_OK) {
             Settings.get().security().showHiddenDialogs = true
-            ReconfigureOptionsHide(true)
+            reconfigureOptionsHide(true)
             notifyDataSetChanged()
         }
     }
@@ -106,9 +114,9 @@ class DialogsFragment : BaseMvpFragment<DialogsPresenter, IDialogsView>(), IDial
         }
     }
 
-    internal fun ReconfigureOptionsHide(isShowHidden: Boolean) {
+    internal fun reconfigureOptionsHide(isShowHidden: Boolean) {
         mAdapter?.updateShowHidden(isShowHidden)
-        if (!Settings.get().security().hasHiddenDialogs()) {
+        if (!Settings.get().security().hasHiddenDialogs) {
             mFab?.setImageResource(R.drawable.pencil)
             Settings.get().security().showHiddenDialogs = false
             return
@@ -174,7 +182,7 @@ class DialogsFragment : BaseMvpFragment<DialogsPresenter, IDialogsView>(), IDial
         mFab?.setOnClickListener {
             if (Settings.get().security().showHiddenDialogs) {
                 Settings.get().security().showHiddenDialogs = false
-                ReconfigureOptionsHide(false)
+                reconfigureOptionsHide(false)
                 notifyDataSetChanged()
             } else {
                 if (mFab?.isEdit == true) {
@@ -186,7 +194,7 @@ class DialogsFragment : BaseMvpFragment<DialogsPresenter, IDialogsView>(), IDial
         }
         mFab?.setOnLongClickListener {
             if (!Settings.get().security().showHiddenDialogs && Settings.get().security()
-                    .hasHiddenDialogs()
+                    .hasHiddenDialogs
             ) {
                 onSecurityClick()
             }
@@ -195,7 +203,7 @@ class DialogsFragment : BaseMvpFragment<DialogsPresenter, IDialogsView>(), IDial
         mFabScrollListener = mFab?.getRecyclerObserver(20)
         mRecyclerView = root.findViewById(R.id.recycleView)
         mRecyclerView?.layoutManager = LinearLayoutManager(requireActivity())
-        mRecyclerView?.addOnScrollListener(PicassoPauseOnScrollListener(DialogsAdapter.PICASSO_TAG))
+        PicassoPauseOnScrollListener.addListener(mRecyclerView, DialogsAdapter.PICASSO_TAG)
         mRecyclerView?.addOnScrollListener(object : EndlessRecyclerOnScrollListener() {
             override fun onScrollToLastElement() {
                 presenter?.fireScrollToEnd()
@@ -209,7 +217,7 @@ class DialogsFragment : BaseMvpFragment<DialogsPresenter, IDialogsView>(), IDial
         mAdapter = DialogsAdapter(requireActivity(), emptyList())
         mAdapter?.setClickListener(this)
         mRecyclerView?.adapter = mAdapter
-        ReconfigureOptionsHide(Settings.get().security().showHiddenDialogs)
+        reconfigureOptionsHide(Settings.get().security().showHiddenDialogs)
         return root
     }
 
@@ -234,9 +242,6 @@ class DialogsFragment : BaseMvpFragment<DialogsPresenter, IDialogsView>(), IDial
                     )
                 }
             }).attachToRecyclerView(mRecyclerView)
-            if (needHelp(HelperSimple.DIALOG_SEND_HELPER, 3)) {
-                showSnackbar(R.string.dialog_send_helper, true)
-            }
         }
     }
 
@@ -279,7 +284,7 @@ class DialogsFragment : BaseMvpFragment<DialogsPresenter, IDialogsView>(), IDial
                 true
             )
         )
-        if (contextView.pCanAddToHomescreen) {
+        if (contextView.pCanAddToHomeScreen) {
             menus.add(OptionRequest(3, addToHomeScreen, R.drawable.ic_home_outline, false))
         }
         if (contextView.pCanConfigNotifications) {
@@ -324,85 +329,83 @@ class DialogsFragment : BaseMvpFragment<DialogsPresenter, IDialogsView>(), IDial
         )
         menus.columns(1)
         menus.show(
-            requireActivity().supportFragmentManager,
-            "dialog_options",
-            object : ModalBottomSheetDialogFragment.Listener {
-                override fun onModalOptionSelected(option: Option) {
-                    when (option.id) {
-                        1 -> CustomSnackbars.createCustomSnackbars(view)
-                            ?.setDurationSnack(BaseTransientBottomBar.LENGTH_LONG)
-                            ?.themedSnack(R.string.delete_chat_do)
-                            ?.setAction(
-                                R.string.button_yes
-                            ) {
-                                presenter?.fireRemoveDialogClick(
-                                    dialog
-                                )
-                            }
-                            ?.show()
-
-                        2 -> if (contextView.pIsPinned) {
-                            presenter?.fireUnPin(
-                                dialog
-                            )
-                        } else {
-                            presenter?.firePin(
-                                dialog
-                            )
-                        }
-
-                        3 -> presenter?.fireCreateShortcutClick(
-                            dialog
-                        )
-
-                        4 -> if (hasOreo()) {
-                            val accountId = Settings.get().accounts().current
-                            var mask = Settings.get()
-                                .notifications()
-                                .getNotifPref(accountId, dialog.peerId)
-                            mask = if (hasFlag(mask, INotificationSettings.FLAG_SHOW_NOTIF)) {
-                                removeFlag(mask, INotificationSettings.FLAG_SHOW_NOTIF)
-                            } else {
-                                addFlagIf(mask, INotificationSettings.FLAG_SHOW_NOTIF, true)
-                            }
-                            Settings.get()
-                                .notifications()
-                                .setNotifPref(accountId, dialog.peerId, mask)
-                            mAdapter?.notifyDataSetChanged()
-                        } else {
-                            presenter?.fireNotificationsSettingsClick(
-                                dialog
-                            )
-                        }
-
-                        5 -> presenter?.fireAddToLauncherShortcuts(
-                            dialog
-                        )
-
-                        6 -> if (!Settings.get().security().isUsePinForSecurity) {
-                            createCustomToast(requireActivity()).showToastError(R.string.not_supported_hide)
-                            securitySettingsPlace.tryOpenWith(requireActivity())
-                        } else {
-                            Settings.get().security().addHiddenDialog(dialog.getOwnerObjectId())
-                            ReconfigureOptionsHide(Settings.get().security().showHiddenDialogs)
-                            notifyDataSetChanged()
-                            if (needHelp(HelperSimple.HIDDEN_DIALOGS, 3)) {
-                                showSnackbar(R.string.hidden_dialogs_helper, true)
-                            }
-                        }
-
-                        7 -> {
-                            Settings.get().security().removeHiddenDialog(dialog.getOwnerObjectId())
-                            ReconfigureOptionsHide(Settings.get().security().showHiddenDialogs)
-                            notifyDataSetChanged()
-                        }
-
-                        8 -> presenter?.fireRead(
+            childFragmentManager,
+            "dialog_options"
+        ) { _, option ->
+            when (option.id) {
+                1 -> CustomSnackbars.createCustomSnackbars(view)
+                    ?.setDurationSnack(BaseTransientBottomBar.LENGTH_LONG)
+                    ?.themedSnack(R.string.delete_chat_do)
+                    ?.setAction(
+                        R.string.button_yes
+                    ) {
+                        presenter?.fireRemoveDialogClick(
                             dialog
                         )
                     }
+                    ?.show()
+
+                2 -> if (contextView.pIsPinned) {
+                    presenter?.fireUnPin(
+                        dialog
+                    )
+                } else {
+                    presenter?.firePin(
+                        dialog
+                    )
                 }
-            })
+
+                3 -> presenter?.fireCreateShortcutClick(
+                    dialog
+                )
+
+                4 -> if (hasOreo()) {
+                    val accountId = Settings.get().accounts().current
+                    var mask = Settings.get()
+                        .notifications()
+                        .getNotifPref(accountId, dialog.peerId)
+                    mask = if (hasFlag(mask, INotificationSettings.FLAG_SHOW_NOTIF)) {
+                        removeFlag(mask, INotificationSettings.FLAG_SHOW_NOTIF)
+                    } else {
+                        addFlagIf(mask, INotificationSettings.FLAG_SHOW_NOTIF, true)
+                    }
+                    Settings.get()
+                        .notifications()
+                        .setNotifPref(accountId, dialog.peerId, mask)
+                    mAdapter?.notifyDataSetChanged()
+                } else {
+                    presenter?.fireNotificationsSettingsClick(
+                        dialog
+                    )
+                }
+
+                5 -> presenter?.fireAddToLauncherShortcuts(
+                    dialog
+                )
+
+                6 -> if (!Settings.get().security().isUsePinForSecurity) {
+                    createCustomToast(requireActivity()).showToastError(R.string.not_supported_hide)
+                    securitySettingsPlace.tryOpenWith(requireActivity())
+                } else {
+                    Settings.get().security().addHiddenDialog(dialog.getOwnerObjectId())
+                    reconfigureOptionsHide(Settings.get().security().showHiddenDialogs)
+                    notifyDataSetChanged()
+                    if (needHelp(HelperSimple.HIDDEN_DIALOGS, 3)) {
+                        showSnackbar(R.string.hidden_dialogs_helper, true)
+                    }
+                }
+
+                7 -> {
+                    Settings.get().security().removeHiddenDialog(dialog.getOwnerObjectId())
+                    reconfigureOptionsHide(Settings.get().security().showHiddenDialogs)
+                    notifyDataSetChanged()
+                }
+
+                8 -> presenter?.fireRead(
+                    dialog
+                )
+            }
+        }
         return true
     }
 
@@ -412,6 +415,10 @@ class DialogsFragment : BaseMvpFragment<DialogsPresenter, IDialogsView>(), IDial
             ?.setAction(R.string.button_yes) {
                 presenter?.fireRefresh()
             }?.show()
+    }
+
+    override fun showDialogSendHelper() {
+        showSnackbar(R.string.dialog_send_helper, true)
     }
 
     override fun onAvatarClick(dialog: Dialog) {
@@ -577,7 +584,7 @@ class DialogsFragment : BaseMvpFragment<DialogsPresenter, IDialogsView>(), IDial
 
     private class ContextView : IContextView {
         var pCanDelete = false
-        var pCanAddToHomescreen = false
+        var pCanAddToHomeScreen = false
         var pCanConfigNotifications = false
         var pCanAddToShortcuts = false
         var pCanRead = false
@@ -587,8 +594,8 @@ class DialogsFragment : BaseMvpFragment<DialogsPresenter, IDialogsView>(), IDial
             pCanDelete = can
         }
 
-        override fun setCanAddToHomescreen(can: Boolean) {
-            pCanAddToHomescreen = can
+        override fun setCanAddToHomeScreen(can: Boolean) {
+            pCanAddToHomeScreen = can
         }
 
         override fun setCanConfigNotifications(can: Boolean) {

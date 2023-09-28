@@ -25,6 +25,7 @@ import dev.ragnarok.fenrir.model.Link
 import dev.ragnarok.fenrir.model.Market
 import dev.ragnarok.fenrir.model.MarketAlbum
 import dev.ragnarok.fenrir.model.Message
+import dev.ragnarok.fenrir.model.Narratives
 import dev.ragnarok.fenrir.model.Peer
 import dev.ragnarok.fenrir.model.Photo
 import dev.ragnarok.fenrir.model.PhotoAlbum
@@ -110,7 +111,7 @@ abstract class PlaceSupportMvpFragment<P : PlaceSupportPresenter<V>, V> : BaseMv
         presenter?.fireVideoClick(video)
     }
 
-    override fun onAudioPlay(position: Int, audios: ArrayList<Audio>) {
+    override fun onAudioPlay(position: Int, audios: ArrayList<Audio>, holderPosition: Int?) {
         presenter?.fireAudioPlayClick(position, audios)
     }
 
@@ -174,6 +175,10 @@ abstract class PlaceSupportMvpFragment<P : PlaceSupportPresenter<V>, V> : BaseMv
 
     override fun onStoryOpen(story: Story) {
         presenter?.fireStoryClick(story)
+    }
+
+    override fun onNarrativeOpen(narratives: Narratives) {
+        presenter?.fireNarrativeClick(narratives)
     }
 
     override fun onUrlPhotoOpen(url: String, prefix: String, photo_prefix: String) {
@@ -291,7 +296,7 @@ abstract class PlaceSupportMvpFragment<P : PlaceSupportPresenter<V>, V> : BaseMv
 
     override fun playAudioList(accountId: Long, position: Int, apiAudio: ArrayList<Audio>) {
         startForPlayList(requireActivity(), apiAudio, position, false)
-        if (!Settings.get().other().isShow_mini_player) PlaceFactory.getPlayerPlace(
+        if (!Settings.get().main().isShow_mini_player) PlaceFactory.getPlayerPlace(
             Settings.get().accounts().current
         ).tryOpenWith(requireActivity())
     }

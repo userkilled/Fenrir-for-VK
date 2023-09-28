@@ -1,6 +1,5 @@
 package dev.ragnarok.fenrir.activity.shortvideopager
 
-import android.content.Context
 import android.os.Bundle
 import dev.ragnarok.fenrir.App.Companion.instance
 import dev.ragnarok.fenrir.Includes.storyPlayerFactory
@@ -15,8 +14,8 @@ import dev.ragnarok.fenrir.model.Commented
 import dev.ragnarok.fenrir.model.Video
 import dev.ragnarok.fenrir.model.VideoSize
 import dev.ragnarok.fenrir.nonNullNoEmpty
+import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.util.AppPerms.hasReadWriteStoragePermission
-import dev.ragnarok.fenrir.util.DownloadWorkUtils.doDownloadVideo
 import dev.ragnarok.fenrir.util.Pair
 import dev.ragnarok.fenrir.util.Utils
 import dev.ragnarok.fenrir.util.Utils.firstNonEmptyString
@@ -24,7 +23,6 @@ import dev.ragnarok.fenrir.util.Utils.firstNonEmptyString
 class ShortVideoPagerPresenter(
     accountId: Long,
     private val ownerId: Long?,
-    private val context: Context,
     savedInstanceState: Bundle?
 ) : AccountDependencyPresenter<IShortVideoPagerView>(accountId, savedInstanceState),
     IStatusChangeListener, IStoryPlayer.IVideoSizeChangeListener {
@@ -266,6 +264,12 @@ class ShortVideoPagerPresenter(
     }
 
     fun fireLikeClick() {
+        if (Settings.get().main().isDisable_likes || Utils.isHiddenAccount(
+                accountId
+            )
+        ) {
+            return
+        }
         if (mShortVideos.isEmpty()) {
             return
         }
@@ -366,7 +370,7 @@ class ShortVideoPagerPresenter(
         )
         shortVideo.setTitle(shortVideo.optionalOwner?.fullName)
         url.nonNullNoEmpty {
-            doDownloadVideo(context, shortVideo, it, "ShortVideo")
+            view?.downloadVideo(shortVideo, it, "ShortVideo")
         }
     }
 

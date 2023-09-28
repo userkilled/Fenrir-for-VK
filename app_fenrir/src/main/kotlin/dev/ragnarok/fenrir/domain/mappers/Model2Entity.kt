@@ -1,16 +1,83 @@
 package dev.ragnarok.fenrir.domain.mappers
 
-import dev.ragnarok.fenrir.db.model.entity.*
+import dev.ragnarok.fenrir.db.model.entity.ArticleDboEntity
+import dev.ragnarok.fenrir.db.model.entity.AudioArtistDboEntity
 import dev.ragnarok.fenrir.db.model.entity.AudioArtistDboEntity.AudioArtistImageEntity
+import dev.ragnarok.fenrir.db.model.entity.AudioDboEntity
+import dev.ragnarok.fenrir.db.model.entity.AudioMessageDboEntity
+import dev.ragnarok.fenrir.db.model.entity.AudioPlaylistDboEntity
+import dev.ragnarok.fenrir.db.model.entity.CallDboEntity
+import dev.ragnarok.fenrir.db.model.entity.DboEntity
+import dev.ragnarok.fenrir.db.model.entity.DialogDboEntity
+import dev.ragnarok.fenrir.db.model.entity.DocumentDboEntity
 import dev.ragnarok.fenrir.db.model.entity.DocumentDboEntity.GraffitiDbo
 import dev.ragnarok.fenrir.db.model.entity.DocumentDboEntity.VideoPreviewDbo
+import dev.ragnarok.fenrir.db.model.entity.EventDboEntity
+import dev.ragnarok.fenrir.db.model.entity.GeoDboEntity
+import dev.ragnarok.fenrir.db.model.entity.GiftItemDboEntity
+import dev.ragnarok.fenrir.db.model.entity.GraffitiDboEntity
+import dev.ragnarok.fenrir.db.model.entity.KeyboardEntity
 import dev.ragnarok.fenrir.db.model.entity.KeyboardEntity.ButtonEntity
+import dev.ragnarok.fenrir.db.model.entity.LinkDboEntity
+import dev.ragnarok.fenrir.db.model.entity.MarketAlbumDboEntity
+import dev.ragnarok.fenrir.db.model.entity.MarketDboEntity
+import dev.ragnarok.fenrir.db.model.entity.MessageDboEntity
+import dev.ragnarok.fenrir.db.model.entity.NarrativesDboEntity
+import dev.ragnarok.fenrir.db.model.entity.NotSupportedDboEntity
+import dev.ragnarok.fenrir.db.model.entity.PageDboEntity
+import dev.ragnarok.fenrir.db.model.entity.PhotoAlbumDboEntity
+import dev.ragnarok.fenrir.db.model.entity.PhotoDboEntity
+import dev.ragnarok.fenrir.db.model.entity.PhotoSizeEntity
+import dev.ragnarok.fenrir.db.model.entity.PollDboEntity
+import dev.ragnarok.fenrir.db.model.entity.PostDboEntity
 import dev.ragnarok.fenrir.db.model.entity.PostDboEntity.SourceDbo
+import dev.ragnarok.fenrir.db.model.entity.PrivacyEntity
+import dev.ragnarok.fenrir.db.model.entity.ReactionAssetEntity
+import dev.ragnarok.fenrir.db.model.entity.ReactionEntity
+import dev.ragnarok.fenrir.db.model.entity.StickerDboEntity
 import dev.ragnarok.fenrir.db.model.entity.StickerDboEntity.AnimationEntity
+import dev.ragnarok.fenrir.db.model.entity.StoryDboEntity
+import dev.ragnarok.fenrir.db.model.entity.VideoDboEntity
+import dev.ragnarok.fenrir.db.model.entity.WallReplyDboEntity
 import dev.ragnarok.fenrir.domain.mappers.MapUtil.mapAll
 import dev.ragnarok.fenrir.domain.mappers.MapUtil.mapAndAdd
-import dev.ragnarok.fenrir.model.*
+import dev.ragnarok.fenrir.model.AbsModel
+import dev.ragnarok.fenrir.model.AbsModelType
+import dev.ragnarok.fenrir.model.Article
+import dev.ragnarok.fenrir.model.Attachments
+import dev.ragnarok.fenrir.model.Audio
+import dev.ragnarok.fenrir.model.AudioArtist
 import dev.ragnarok.fenrir.model.AudioArtist.AudioArtistImage
+import dev.ragnarok.fenrir.model.AudioPlaylist
+import dev.ragnarok.fenrir.model.Call
+import dev.ragnarok.fenrir.model.CryptStatus
+import dev.ragnarok.fenrir.model.Dialog
+import dev.ragnarok.fenrir.model.Document
+import dev.ragnarok.fenrir.model.Event
+import dev.ragnarok.fenrir.model.Geo
+import dev.ragnarok.fenrir.model.GiftItem
+import dev.ragnarok.fenrir.model.Graffiti
+import dev.ragnarok.fenrir.model.Keyboard
+import dev.ragnarok.fenrir.model.Link
+import dev.ragnarok.fenrir.model.Market
+import dev.ragnarok.fenrir.model.MarketAlbum
+import dev.ragnarok.fenrir.model.Message
+import dev.ragnarok.fenrir.model.Narratives
+import dev.ragnarok.fenrir.model.NotSupported
+import dev.ragnarok.fenrir.model.Photo
+import dev.ragnarok.fenrir.model.PhotoAlbum
+import dev.ragnarok.fenrir.model.PhotoSizes
+import dev.ragnarok.fenrir.model.Poll
+import dev.ragnarok.fenrir.model.Post
+import dev.ragnarok.fenrir.model.Reaction
+import dev.ragnarok.fenrir.model.ReactionAsset
+import dev.ragnarok.fenrir.model.SimplePrivacy
+import dev.ragnarok.fenrir.model.Sticker
+import dev.ragnarok.fenrir.model.Story
+import dev.ragnarok.fenrir.model.Video
+import dev.ragnarok.fenrir.model.VoiceMessage
+import dev.ragnarok.fenrir.model.WallReply
+import dev.ragnarok.fenrir.model.WikiPage
 import dev.ragnarok.fenrir.orZero
 import dev.ragnarok.fenrir.requireNonNull
 
@@ -53,6 +120,16 @@ object Model2Entity {
             .setMinor_id(model.getMinor_id())
     }
 
+    fun buildReactionAssetEntity(dto: ReactionAsset): ReactionAssetEntity {
+        return ReactionAssetEntity().setReactionId(dto.reaction_id)
+            .setBigAnimation(dto.big_animation).setSmallAnimation(dto.small_animation)
+            .setStatic(dto.static)
+    }
+
+    private fun buildReactionEntity(dto: Reaction): ReactionEntity {
+        return ReactionEntity().setReactionId(dto.reaction_id).setCount(dto.count)
+    }
+
     fun buildMessageEntity(message: Message): MessageDboEntity {
         return MessageDboEntity().set(message.getObjectId(), message.peerId, message.senderId)
             .setDate(message.date)
@@ -84,6 +161,11 @@ object Model2Entity {
             .setUpdateTime(message.updateTime)
             .setPayload(message.payload)
             .setKeyboard(buildKeyboardEntity(message.keyboard))
+            .setConversationMessageId(message.conversation_message_id)
+            .setReactionId(message.reaction_id)
+            .setReactions(mapAll(
+                message.reactions
+            ) { buildReactionEntity(it) })
     }
 
     private fun buildEntityAttachments(attachments: Attachments): List<DboEntity> {
@@ -136,6 +218,11 @@ object Model2Entity {
         mapAndAdd(
             attachments.stories,
             { buildStoryDbo(it) },
+            entities
+        )
+        mapAndAdd(
+            attachments.narratives,
+            { buildNarrativeDbo(it) },
             entities
         )
         mapAndAdd(
@@ -256,6 +343,10 @@ object Model2Entity {
                     entities.add(buildStoryDbo(model as Story))
                 }
 
+                AbsModelType.MODEL_NARRATIVE -> {
+                    entities.add(buildNarrativeDbo(model as Narratives))
+                }
+
                 AbsModelType.MODEL_AUDIO_PLAYLIST -> {
                     entities.add(buildAudioPlaylistEntity(model as AudioPlaylist))
                 }
@@ -339,6 +430,22 @@ object Model2Entity {
         return PollDboEntity.Answer().set(answer.id, answer.text, answer.voteCount, answer.rate)
     }
 
+    fun map(entity: Poll.PollBackgroundPoint): PollDboEntity.BackgroundPointEntity {
+        return PollDboEntity.BackgroundPointEntity(entity.color, entity.position)
+    }
+
+    fun map(model: Poll.PollBackground?): PollDboEntity.BackgroundEntity? {
+        if (model == null) {
+            return null
+        }
+        return PollDboEntity.BackgroundEntity(
+            model.id,
+            model.angle,
+            model.name,
+            mapAll(model.points, Model2Entity::map)
+        )
+    }
+
     private fun buildPollDbo(poll: Poll): PollDboEntity {
         return PollDboEntity().set(poll.id, poll.ownerId)
             .setAnswers(
@@ -361,6 +468,7 @@ object Model2Entity {
             .setEndDate(poll.endDate)
             .setMultiple(poll.isMultiple)
             .setPhoto(poll.photo)
+            .setBackground(map(poll.background))
     }
 
     private fun buildLinkDbo(link: Link): LinkDboEntity {
@@ -381,6 +489,16 @@ object Model2Entity {
             .setSubTitle(dbo.subTitle)
             .setURL(dbo.uRL)
             .setIsFavorite(dbo.isFavorite)
+    }
+
+    private fun buildNarrativeDbo(dbo: Narratives): NarrativesDboEntity {
+        return NarrativesDboEntity()
+            .setId(dbo.id)
+            .setOwnerId(dbo.owner_id)
+            .setTitle(dbo.title)
+            .setCover(dbo.cover)
+            .setStory_ids(dbo.stories)
+            .setAccessKey(dbo.accessKey)
     }
 
     private fun buildStoryDbo(dbo: Story): StoryDboEntity {
@@ -531,6 +649,17 @@ object Model2Entity {
         return dbo
     }
 
+    fun buildVideoTimelineDbo(entity: Video.VideoTimeline): VideoDboEntity.VideoDboTimelineEntity {
+        return VideoDboEntity.VideoDboTimelineEntity().setCountPerImage(entity.countPerImage)
+            .setCountPerRow(entity.countPerRow)
+            .setCountTotal(entity.countTotal)
+            .setFrameHeight(entity.frameHeight)
+            .setFrameWidth(entity.frameWidth)
+            .setFrequency(entity.frequency)
+            .setIsUv(entity.isUv)
+            .setLinks(entity.links)
+    }
+
     private fun buildVideoDbo(video: Video): VideoDboEntity {
         return VideoDboEntity().set(video.id, video.ownerId)
             .setAlbumId(video.albumId)
@@ -565,6 +694,8 @@ object Model2Entity {
             .setCanRepost(video.isCanRepost)
             .setPrivate(video.private)
             .setFavorite(video.isFavorite)
+            .setTrailer(video.trailer)
+            .setTimelineThumbs(video.timelineThumbs?.let { buildVideoTimelineDbo(it) })
     }
 
     private fun mapPrivacy(privacy: SimplePrivacy): PrivacyEntity {
@@ -725,5 +856,7 @@ object Model2Entity {
             .setY(model2entityNullable(sizes.getY()))
             .setZ(model2entityNullable(sizes.getZ()))
             .setW(model2entityNullable(sizes.getW()))
+            .setK(model2entityNullable(sizes.getK()))
+            .setL(model2entityNullable(sizes.getL()))
     }
 }

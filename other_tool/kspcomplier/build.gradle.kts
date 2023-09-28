@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "dev.umerov.ksp"
-version = "1.0-SNAPSHOT"
+version = "1.0"
 
 repositories {
     mavenCentral()
@@ -13,10 +13,10 @@ repositories {
 
 dependencies {
     implementation(kotlin("stdlib"))
-    implementation("androidx.annotation:annotation:1.4.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.4.0-RC")
+    implementation("androidx.annotation:annotation:1.7.0-beta01")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.0-RC")
 
-    implementation("com.google.devtools.ksp:symbol-processing-api:1.7.0-1.0.6")
+    implementation("com.google.devtools.ksp:symbol-processing-api:1.9.0-1.0.13")
 }
 
 sourceSets.main {

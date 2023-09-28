@@ -4,7 +4,13 @@
 
 package dev.ragnarok.fenrir.util.serializeble.json
 
-import kotlinx.serialization.*
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.PolymorphicSerializer
+import kotlinx.serialization.SealedClassSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.PolymorphicKind
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildSerialDescriptor
@@ -13,6 +19,7 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.SerializersModuleBuilder
 import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.serializerOrNull
 import kotlin.reflect.KClass
 
 /**
@@ -60,11 +67,12 @@ import kotlin.reflect.KClass
  *
  * // Now both statements will yield different subclasses of Payment:
  *
- * Json.parse(PaymentSerializer, """{"amount":"1.0","date":"03.02.2020"}""")
- * Json.parse(PaymentSerializer, """{"amount":"2.0","date":"03.02.2020","reason":"complaint"}""")
+ * Json.decodeFromString(PaymentSerializer, """{"amount":"1.0","date":"03.02.2020"}""")
+ * Json.decodeFromString(PaymentSerializer, """{"amount":"2.0","date":"03.02.2020","reason":"complaint"}""")
  * ```
  *
- * @param T A root class for all classes that could be possibly encountered during serialization and deserialization.
+ * @param T A root type for all classes that could be possibly encountered during serialization and deserialization.
+ * Must be non-final class or interface.
  * @param baseClass A class token for [T].
  */
 @OptIn(ExperimentalSerializationApi::class)

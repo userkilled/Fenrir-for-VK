@@ -42,7 +42,6 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import androidx.appcompat.content.res.AppCompatResources;
 import android.util.AttributeSet;
-import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
@@ -74,6 +73,8 @@ import androidx.core.view.accessibility.AccessibilityViewCommand;
 import androidx.customview.view.AbsSavedState;
 import com.google.android.material.animation.AnimationUtils;
 import com.google.android.material.appbar.AppBarLayout.BaseBehavior.SavedState;
+import com.google.android.material.color.MaterialColors;
+import com.google.android.material.drawable.DrawableUtils;
 import com.google.android.material.internal.ThemeEnforcement;
 import com.google.android.material.motion.MotionUtils;
 import com.google.android.material.resources.MaterialResources;
@@ -135,8 +136,10 @@ import java.util.List;
  * &lt;/androidx.coordinatorlayout.widget.CoordinatorLayout&gt;
  * </pre>
  *
- * @see <a href="https://material.io/components/app-bars-top#anatomy">
- *     https://material.io/components/app-bars-top#anatomy</a>
+ * <p>For more information, see the <a
+ * href="https://github.com/material-components/material-components-android/blob/master/docs/components/TopAppBar.md">component
+ * developer guidance</a> and <a href="https://material.io/components/top-app-bar/overview">design
+ * guidelines</a>.
  */
 public class AppBarLayout extends LinearLayout implements CoordinatorLayout.AttachedBehavior {
 
@@ -205,7 +208,7 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
   private boolean liftOnScroll;
   @IdRes private int liftOnScrollTargetViewId;
   @Nullable private WeakReference<View> liftOnScrollTargetView;
-  @Nullable private final ColorStateList liftOnScrollColor;
+  private final boolean hasLiftOnScrollColor;
   @Nullable private ValueAnimator liftOnScrollColorAnimator;
   @Nullable private AnimatorUpdateListener liftOnScrollColorUpdateListener;
   private final List<LiftOnScrollListener> liftOnScrollListeners = new ArrayList<>();
@@ -216,6 +219,7 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
   private int[] tmpStatesArray;
 
   @Nullable private Drawable statusBarForeground;
+  @Nullable private Integer statusBarForegroundOriginalColor;
 
   private final float appBarElevation;
 
@@ -235,7 +239,7 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
     context = getContext();
     setOrientation(VERTICAL);
 
-    if (Build.VERSION.SDK_INT >= 21) {
+    if (VERSION.SDK_INT >= 21) {
       // Use the bounds view outline provider so that we cast a shadow, even without a
       // background
       if (getOutlineProvider() == ViewOutlineProvider.BACKGROUND) {
@@ -253,22 +257,22 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
 
     ViewCompat.setBackground(this, a.getDrawable(R.styleable.AppBarLayout_android_background));
 
-    liftOnScrollColor =
-        MaterialResources.getColorStateList(
-            context, a, R.styleable.AppBarLayout_liftOnScrollColor);
+    ColorStateList liftOnScrollColor =
+        MaterialResources.getColorStateList(context, a, R.styleable.AppBarLayout_liftOnScrollColor);
+    hasLiftOnScrollColor = liftOnScrollColor != null;
 
-    if (getBackground() instanceof ColorDrawable) {
-      ColorDrawable background = (ColorDrawable) getBackground();
+    ColorStateList originalBackgroundColor = DrawableUtils.getColorStateListOrNull(getBackground());
+    if (originalBackgroundColor != null) {
       MaterialShapeDrawable materialShapeDrawable = new MaterialShapeDrawable();
-      materialShapeDrawable.setFillColor(ColorStateList.valueOf(background.getColor()));
+      materialShapeDrawable.setFillColor(originalBackgroundColor);
       // If there is a lift on scroll color specified, we do not initialize the elevation overlay
       // and set the alpha to zero manually.
       if (liftOnScrollColor != null) {
-        initializeLiftOnScrollWithColor(materialShapeDrawable);
+        initializeLiftOnScrollWithColor(
+            materialShapeDrawable, originalBackgroundColor, liftOnScrollColor);
       } else {
         initializeLiftOnScrollWithElevation(context, materialShapeDrawable);
       }
-      ViewCompat.setBackground(this, materialShapeDrawable);
     }
 
     liftOnScrollColorDuration = MotionUtils.resolveThemeDuration(context,
@@ -280,16 +284,16 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
     if (a.hasValue(R.styleable.AppBarLayout_expanded)) {
       setExpanded(
           a.getBoolean(R.styleable.AppBarLayout_expanded, false),
-          /* animate */ false,
-          /* force */ false);
+          /* animate= */ false,
+          /* force= */ false);
     }
 
-    if (Build.VERSION.SDK_INT >= 21 && a.hasValue(R.styleable.AppBarLayout_elevation)) {
+    if (VERSION.SDK_INT >= 21 && a.hasValue(R.styleable.AppBarLayout_elevation)) {
       ViewUtilsLollipop.setDefaultAppBarLayoutStateListAnimator(
           this, a.getDimensionPixelSize(R.styleable.AppBarLayout_elevation, 0));
     }
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    if (VERSION.SDK_INT >= VERSION_CODES.O) {
       // In O+, we have these values set in the style. Since there is no defStyleAttr for
       // AppBarLayout at the AppCompat level, check for these attributes here.
       if (a.hasValue(R.styleable.AppBarLayout_android_keyboardNavigationCluster)) {
@@ -322,20 +326,35 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
         });
   }
 
-  private void initializeLiftOnScrollWithColor(MaterialShapeDrawable background) {
-    background.setAlpha(lifted ? 255 : 0);
-    background.setFillColor(liftOnScrollColor);
-    liftOnScrollColorUpdateListener = valueAnimator -> {
-      float alpha = (float) valueAnimator.getAnimatedValue();
-      background.setAlpha((int) alpha);
+  private void initializeLiftOnScrollWithColor(
+      MaterialShapeDrawable background,
+      @NonNull ColorStateList originalBackgroundColor,
+      @NonNull ColorStateList liftOnScrollColor) {
+    Integer colorSurface = MaterialColors.getColorOrNull(getContext(), R.attr.colorSurface);
+    liftOnScrollColorUpdateListener =
+        valueAnimator -> {
+          float liftProgress = (float) valueAnimator.getAnimatedValue();
+          int mixedColor =
+              MaterialColors.layer(
+                  originalBackgroundColor.getDefaultColor(),
+                  liftOnScrollColor.getDefaultColor(),
+                  liftProgress);
+          background.setFillColor(ColorStateList.valueOf(mixedColor));
+          if (statusBarForeground != null
+              && statusBarForegroundOriginalColor != null
+              && statusBarForegroundOriginalColor.equals(colorSurface)) {
+            DrawableCompat.setTint(statusBarForeground, mixedColor);
+          }
 
-      for (LiftOnScrollListener liftOnScrollListener : liftOnScrollListeners) {
-        if (background.getFillColor() != null) {
-          liftOnScrollListener.onUpdate(
-              0, background.getFillColor().withAlpha((int) alpha).getDefaultColor());
-        }
-      }
-    };
+          if (!liftOnScrollListeners.isEmpty()) {
+            for (LiftOnScrollListener liftOnScrollListener : liftOnScrollListeners) {
+              if (background.getFillColor() != null) {
+                liftOnScrollListener.onUpdate(0, mixedColor);
+              }
+            }
+          }
+        };
+    ViewCompat.setBackground(this, background);
   }
 
   private void initializeLiftOnScrollWithElevation(
@@ -351,6 +370,7 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
         liftOnScrollListener.onUpdate(elevation, background.getResolvedTintColor());
       }
     };
+    ViewCompat.setBackground(this, background);
   }
 
   /**
@@ -427,6 +447,7 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
         statusBarForeground.setCallback(null);
       }
       statusBarForeground = drawable != null ? drawable.mutate() : null;
+      statusBarForegroundOriginalColor = extractStatusBarForegroundColor();
       if (statusBarForeground != null) {
         if (statusBarForeground.isStateful()) {
           statusBarForeground.setState(getDrawableState());
@@ -475,6 +496,19 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
   @Nullable
   public Drawable getStatusBarForeground() {
     return statusBarForeground;
+  }
+
+  @Nullable
+  private Integer extractStatusBarForegroundColor() {
+    if (statusBarForeground instanceof MaterialShapeDrawable) {
+      return ((MaterialShapeDrawable) statusBarForeground).getResolvedTintColor();
+    }
+    ColorStateList statusBarForegroundColorStateList =
+        DrawableUtils.getColorStateListOrNull(statusBarForeground);
+    if (statusBarForegroundColorStateList != null) {
+      return statusBarForegroundColorStateList.getDefaultColor();
+    }
+    return null;
   }
 
   @Override
@@ -644,6 +678,12 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
   public CoordinatorLayout.Behavior<AppBarLayout> getBehavior() {
     behavior = new AppBarLayout.Behavior();
     return behavior;
+  }
+
+  @Nullable
+  public MaterialShapeDrawable getMaterialShapeBackground() {
+    Drawable background = getBackground();
+    return background instanceof MaterialShapeDrawable ? (MaterialShapeDrawable) background : null;
   }
 
   @RequiresApi(VERSION_CODES.LOLLIPOP)
@@ -989,11 +1029,12 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
     if (force && this.lifted != lifted) {
       this.lifted = lifted;
       refreshDrawableState();
-      if (liftOnScroll && getBackground() instanceof MaterialShapeDrawable) {
-        if (liftOnScrollColor != null) {
-          startLiftOnScrollColorAnimation(
-              lifted ? 0 : 255, lifted ? 255 : 0);
-        } else {
+      if (isLiftOnScrollCompatibleBackground()) {
+        if (hasLiftOnScrollColor) {
+          // Only start the liftOnScrollColor based animation because the elevation based
+          // animation will happen via the lifted drawable state change and state list animator.
+          startLiftOnScrollColorAnimation(lifted ? 0 : 1, lifted ? 1 : 0);
+        } else if (liftOnScroll) {
           startLiftOnScrollColorAnimation(
               lifted ? 0 : appBarElevation, lifted ? appBarElevation : 0);
         }
@@ -1001,6 +1042,10 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
       return true;
     }
     return false;
+  }
+
+  private boolean isLiftOnScrollCompatibleBackground() {
+    return getBackground() instanceof MaterialShapeDrawable;
   }
 
   private void startLiftOnScrollColorAnimation(
@@ -1445,7 +1490,6 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
   // TODO(b/76413401): remove this base class and generic type after the widget migration is done
   protected static class BaseBehavior<T extends AppBarLayout> extends HeaderBehavior<T> {
     private static final int MAX_OFFSET_ANIMATION_DURATION = 600; // ms
-    private static final double EXPAND_BY_KEY_EVENT_THRESHOLD_PERCENTAGE = 0.1;
 
     /** Callback to allow control over any {@link AppBarLayout} dragging. */
     // TODO(b/76413401): remove this base class and generic type after the widget migration
@@ -1827,54 +1871,7 @@ public class AppBarLayout extends LinearLayout implements CoordinatorLayout.Atta
       abl.onOffsetChanged(getTopAndBottomOffset());
 
       updateAccessibilityActions(parent, abl);
-      // TODO(b/243555083): Until CoordinatorLayout fixes triggering scroll events with physical
-      //  keyboard scrolling, we have this hack in place.
-      View v = findFirstScrollingChild(parent);
-      if (v != null) {
-        if (VERSION.SDK_INT >= VERSION_CODES.P) {
-          v.addOnUnhandledKeyEventListener(
-              (v1, event) -> {
-                controlExpansionOnKeyPress(event, v, abl);
-                return false;
-              });
-        } else {
-          // Unfortunately if not using >= API 28, we don't have access to the unhandled key event
-          // handler. Using setOnKeyListener is less ideal since it will replace any listener
-          // already on the scrollable child. Furthermore, the 'scrolling' may be occurring due to
-          // switching focus between children of the scrollable child, which will not trigger this
-          // listener.
-          v.setOnKeyListener(
-              (v1, keyCode, event) -> {
-                controlExpansionOnKeyPress(event, v, abl);
-                return false;
-              });
-        }
-      }
       return handled;
-    }
-
-    // TODO(b/243555083): Until CoordinatorLayout fixes triggering scroll events with physical
-    //  keyboard scrolling, we have this hack in place.
-    private void controlExpansionOnKeyPress(
-        KeyEvent event, View scrollableChild, AppBarLayout abl) {
-      if (event.getAction() == KeyEvent.ACTION_DOWN || event.getAction() == KeyEvent.ACTION_UP) {
-        int keyCode = event.getKeyCode();
-        if (keyCode == KeyEvent.KEYCODE_DPAD_UP
-            || keyCode == KeyEvent.KEYCODE_SYSTEM_NAVIGATION_UP
-            || keyCode == KeyEvent.KEYCODE_PAGE_UP) {
-          // If within height threshold, we expand.
-          if (scrollableChild.getScrollY()
-              < scrollableChild.getMeasuredHeight() * EXPAND_BY_KEY_EVENT_THRESHOLD_PERCENTAGE) {
-            abl.setExpanded(true);
-          }
-        } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN
-            || keyCode == KeyEvent.KEYCODE_SYSTEM_NAVIGATION_DOWN
-            || keyCode == KeyEvent.KEYCODE_PAGE_DOWN) {
-          if (scrollableChild.getScrollY() > 0) {
-            abl.setExpanded(false);
-          }
-        }
-      }
     }
 
     private void updateAccessibilityActions(

@@ -137,6 +137,7 @@
     <string name="general_settings">Общие</string>
     <string name="about_settings">О приложении</string>
     <string name="account_cache_cleaner">Очистить кэш и базу данных</string>
+    <string name="ask_account_cache_cleaner">Очистить кэш и базу данных?</string>
     <string name="cache_cleaner">Очистить кэш</string>
     <!-- Quick Reply-->
     <string name="go_to_dialog">К диалогу</string>
@@ -730,10 +731,10 @@
     <string name="no_photos">Нет изображений</string>
     <string name="no_videos">Нет видео</string>
     <string name="invites_you_to_join_community">%1$s приглашает Вас вступить в сообщество</string>
-    <string name="attachments_in_chat">Материалы беседы</string>
+    <string name="attachments_in_chat">Материалы диалога</string>
     <string name="attachments_in_wall">Материалы стены</string>
     <string name="messages_in_json">Чат Json (%1$d сообщений)</string>
-    <string name="change_hrono_history">Показать начало</string>
+    <string name="change_chrono_history">Показать начало</string>
     <string name="show_profile">Профиль</string>
     <string name="unknown_photos_count">неизвестно</string>
     <string name="photos_count">%1$d фото</string>
@@ -899,7 +900,7 @@
     <string name="who_is_not_allowed_to_comment_this_album">Кому комментирование этого альбома запрещено?</string>
     <string name="copy_data">Копировать</string>
     <string name="forward">Переслать</string>
-    <string name="read">Прочесть</string>
+    <string name="read">Прочитать</string>
     <string name="open">Открыть</string>
     <string name="enter_captcha_text">Введите текст с картинки</string>
     <string name="from_camera">Сделать фото</string>
@@ -1032,7 +1033,6 @@
     <string name="vk_photos_tab_title">Фото ВК</string>
     <string name="local_photos_tab_title">Локальные фото</string>
     <string name="local_gallery_tab_title">Галерея</string>
-    <string name="send_short">Отпр.</string>
     <string name="message_attachment_empty_text">Вложений пока нет (лимит 10)</string>
     <string name="button_add_photo">Добавить фото/видео</string>
     <string name="log_type_error">Исключения</string>
@@ -1405,6 +1405,7 @@
     <string name="be_online">Быть онлайн</string>
     <string name="wall_attachments">Вложения на стене</string>
     <string name="posts_analized">%1$d постов проверено</string>
+    <string name="messages_analized">%1$d сообщений проверено</string>
     <string name="comments_analized">%1$d комментариев проверено</string>
     <string name="photo_rounded_view">Скругление краёв изображений</string>
     <string name="font_size">Размер шрифта</string>
@@ -1506,7 +1507,7 @@
     <string name="do_auto_play_video">Автовыбор качества видео</string>
     <string name="video_not_have_link">У видео нет ссылки</string>
     <string name="change_upload_size">Настройки качества отправки фото</string>
-    <string name="wall_themed">Оформление стены для язычников</string>
+    <string name="wall_themed">Языческое оформление</string>
     <string name="runes_show">Показывать руны</string>
     <string name="pagan_symbol">Символ</string>
     <string name="photo_settings">Просмотр фото</string>
@@ -1676,7 +1677,6 @@
     <string name="reset_settings">Сброс настроек</string>
     <string name="wrong_settings_format">Данный формат настроек не поддерживается!</string>
     <string name="settings_for_another_client">Настройки для кейта не подходят для обычного клиента и наоборот!</string>
-    <string name="ongoing_player_notification">Непрерывное уведомление</string>
     <string name="group_members">Участники сообщества</string>
     <string name="donut">Доны</string>
     <string name="all">Все</string>
@@ -1719,4 +1719,11 @@
     <string name="clips">Клипы</string>
     <string name="stories">Истории</string>
     <string name="account_not_registered">Аккаунт не зарегистрирован!</string>
+    <string name="disable_unvote">Запретить отмену голоса</string>
+    <string name="empty_background">Пустой фон</string>
+    <string name="remember">Запомнить</string>
+    <string name="instant_photo_display">Мгновенный показ фото</string>
+    <string name="select_more">Выбрать больше…</string>
+    <string name="chat_popup_menu">Контекстное меню в чате</string>
+    <string name="reactions">Реакции</string>
 </resources>

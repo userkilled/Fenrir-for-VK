@@ -1,13 +1,16 @@
 package dev.ragnarok.fenrir.activity
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.graphics.Color
 import android.os.Bundle
-import android.view.View
+import android.os.IBinder
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import androidx.annotation.ColorInt
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import dev.ragnarok.fenrir.Extra
@@ -26,19 +29,57 @@ import dev.ragnarok.fenrir.getParcelableCompat
 import dev.ragnarok.fenrir.getParcelableExtraCompat
 import dev.ragnarok.fenrir.listener.AppStyleable
 import dev.ragnarok.fenrir.longpoll.NotificationHelper
+import dev.ragnarok.fenrir.media.music.MusicPlaybackController
+import dev.ragnarok.fenrir.media.music.MusicPlaybackService
 import dev.ragnarok.fenrir.model.Document
 import dev.ragnarok.fenrir.model.Peer
 import dev.ragnarok.fenrir.place.Place
 import dev.ragnarok.fenrir.place.PlaceFactory
 import dev.ragnarok.fenrir.place.PlaceProvider
 import dev.ragnarok.fenrir.settings.CurrentTheme
+import dev.ragnarok.fenrir.util.Logger
 import dev.ragnarok.fenrir.util.Utils
 import dev.ragnarok.fenrir.util.ViewUtils
 
-class ChatActivityBubbles : NoMainActivity(), PlaceProvider, AppStyleable {
+class ChatActivityBubbles : NoMainActivity(), PlaceProvider, AppStyleable, ServiceConnection {
     //resolveToolbarNavigationIcon();
     private val mOnBackStackChangedListener =
         FragmentManager.OnBackStackChangedListener { keyboardHide() }
+
+    private var mAudioPlayServiceToken: MusicPlaybackController.ServiceToken? = null
+
+    private fun bindToAudioPlayService() {
+        if (mAudioPlayServiceToken == null) {
+            mAudioPlayServiceToken = MusicPlaybackController.bindToServiceWithoutStart(this, this)
+        }
+    }
+
+    private fun unbindFromAudioPlayService() {
+        if (mAudioPlayServiceToken != null) {
+            if (isChangingConfigurations) {
+                MusicPlaybackController.doNotDestroyWhenActivityRecreated()
+            }
+            MusicPlaybackController.unbindFromService(mAudioPlayServiceToken)
+            mAudioPlayServiceToken = null
+        }
+    }
+
+    private val TAG = "ChatActivityBubbles_LOG"
+
+    override fun onServiceConnected(name: ComponentName, service: IBinder) {
+        if (name.className == MusicPlaybackService::class.java.name) {
+            Logger.d(TAG, "Connected to MusicPlaybackService")
+        }
+    }
+
+    override fun onServiceDisconnected(name: ComponentName) {
+        if (mAudioPlayServiceToken == null) return
+        if (name.className == MusicPlaybackService::class.java.name) {
+            Logger.d(TAG, "Disconnected from MusicPlaybackService")
+            mAudioPlayServiceToken = null
+            bindToAudioPlayService()
+        }
+    }
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +97,8 @@ class ChatActivityBubbles : NoMainActivity(), PlaceProvider, AppStyleable {
             handleIntent(intent)
             supportFragmentManager.addOnBackStackChangedListener(mOnBackStackChangedListener)
         }
+
+        bindToAudioPlayService()
     }
 
     private fun handleIntent(intent: Intent?) {
@@ -180,6 +223,7 @@ class ChatActivityBubbles : NoMainActivity(), PlaceProvider, AppStyleable {
         NotificationHelper.resetBubbleOpened(this, true)
         supportFragmentManager.removeOnBackStackChangedListener(mOnBackStackChangedListener)
         ViewUtils.keyboardHide(this)
+        unbindFromAudioPlayService()
         super.onDestroy()
     }
 
@@ -191,31 +235,17 @@ class ChatActivityBubbles : NoMainActivity(), PlaceProvider, AppStyleable {
         val statusbarNonColored = CurrentTheme.getStatusBarNonColored(this)
         val statusbarColored = CurrentTheme.getStatusBarColor(this)
         val w = window
-        w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-        w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         w.statusBarColor = if (colored) statusbarColored else statusbarNonColored
         @ColorInt val navigationColor =
             if (colored) CurrentTheme.getNavigationBarColor(this) else Color.BLACK
         w.navigationBarColor = navigationColor
-        if (Utils.hasMarshmallow()) {
-            var flags = window.decorView.systemUiVisibility
-            flags = if (invertIcons) {
-                flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-            } else {
-                flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-            }
-            window.decorView.systemUiVisibility = flags
-        }
-        if (Utils.hasOreo()) {
-            var flags = window.decorView.systemUiVisibility
-            if (invertIcons) {
-                flags = flags or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-                w.decorView.systemUiVisibility = flags
-                w.navigationBarColor = Color.WHITE
-            } else {
-                flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
-                w.decorView.systemUiVisibility = flags
-            }
+        val ins = WindowInsetsControllerCompat(w, w.decorView)
+        ins.isAppearanceLightStatusBars = invertIcons
+        ins.isAppearanceLightNavigationBars = invertIcons
+
+        if (!Utils.hasMarshmallow()) {
+            w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+            w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         }
     }
 

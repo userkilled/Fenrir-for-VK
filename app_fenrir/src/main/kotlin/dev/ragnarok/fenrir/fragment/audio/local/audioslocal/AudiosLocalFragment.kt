@@ -9,7 +9,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import dev.ragnarok.fenrir.Constants
 import dev.ragnarok.fenrir.Extra
 import dev.ragnarok.fenrir.R
 import dev.ragnarok.fenrir.fragment.audio.local.localaudioalbums.LocalAudioAlbumsFragment
@@ -66,17 +65,7 @@ class AudiosLocalFragment : BaseMvpFragment<AudiosLocalPresenter, IAudiosLocalVi
         searchView.setQuery("", true)
         searchView.setOnAdditionalButtonClickListener(object : OnAdditionalButtonClickListener {
             override fun onAdditionalButtonClick() {
-                LocalAudioAlbumsFragment.newInstance(
-                    object : LocalAudioAlbumsFragment.Listener {
-                        override fun onSelected(bucket_id: Int) {
-                            presenter?.fireBucketSelected(
-                                bucket_id
-                            )
-                        }
-
-                    }).show(
-                    childFragmentManager, "audio_albums_local"
-                )
+                presenter?.fireLocalAudioAlbums()
             }
 
         })
@@ -93,7 +82,7 @@ class AudiosLocalFragment : BaseMvpFragment<AudiosLocalPresenter, IAudiosLocalVi
         setupSwipeRefreshLayoutWithCurrentTheme(requireActivity(), mSwipeRefreshLayout)
         val recyclerView: RecyclerView = root.findViewById(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(requireActivity())
-        recyclerView.addOnScrollListener(PicassoPauseOnScrollListener(Constants.PICASSO_TAG))
+        PicassoPauseOnScrollListener.addListener(recyclerView)
         recyclerView.addOnScrollListener(object : EndlessRecyclerOnScrollListener() {
             override fun onScrollToLastElement() {
                 presenter?.fireScrollToEnd()
@@ -153,6 +142,23 @@ class AudiosLocalFragment : BaseMvpFragment<AudiosLocalPresenter, IAudiosLocalVi
         } else {
             presenter?.firePrepared()
         }
+    }
+
+    override fun goToLocalAudioAlbums(selectedId: Int) {
+        LocalAudioAlbumsFragment.newInstance(selectedId,
+            object : LocalAudioAlbumsFragment.Listener {
+                override fun onSelected(bucket_id: Int) {
+                    if (Settings.get().main().isRememberLocalAudioAlbum) {
+                        Settings.get().main().currentLocalAudioAlbum = bucket_id
+                    }
+                    presenter?.fireBucketSelected(
+                        bucket_id
+                    )
+                }
+
+            }).show(
+            childFragmentManager, "audio_albums_local"
+        )
     }
 
     override fun setUploadDataVisible(visible: Boolean) {

@@ -29,6 +29,7 @@ import dev.ragnarok.fenrir.listener.OnSectionResumeCallback
 import dev.ragnarok.fenrir.place.Place
 import dev.ragnarok.fenrir.place.PlaceFactory.getAudiosTabsSearchPlace
 import dev.ragnarok.fenrir.settings.Settings
+import dev.ragnarok.fenrir.util.AppPerms
 import dev.ragnarok.fenrir.util.Utils.createPageTransform
 import dev.ragnarok.fenrir.view.navigation.AbsNavigationView
 
@@ -86,6 +87,7 @@ class AudiosTabsFragment : BaseFragment(), MenuProvider {
                     VKApiAudio.Genre.getTitleByGenre(requireActivity(), fid)
             }
         }.attach()
+        AppPerms.ignoreBattery(requireActivity())
     }
 
     internal fun CreateAudiosFragment(option_menu: Int): Fragment {
@@ -136,13 +138,13 @@ class AudiosTabsFragment : BaseFragment(), MenuProvider {
         if (ownerId >= 0) {
             if (accountId == ownerId) {
                 adapter.addFragment(LOCAL)
-                if (Settings.get().other().localServer.enabled) {
+                if (Settings.get().main().localServer.enabled) {
                     adapter.addFragment(LOCAL_SERVER)
                 }
             }
             adapter.addFragment(MY_RECOMMENDATIONS)
         }
-        if (accountId == ownerId && Settings.get().other().isEnable_show_audio_top) {
+        if (accountId == ownerId && Settings.get().main().isEnable_show_audio_top) {
             adapter.addFragment(VKApiAudio.Genre.TOP_ALL)
             adapter.addFragment(VKApiAudio.Genre.ETHNIC)
             adapter.addFragment(VKApiAudio.Genre.INSTRUMENTAL)

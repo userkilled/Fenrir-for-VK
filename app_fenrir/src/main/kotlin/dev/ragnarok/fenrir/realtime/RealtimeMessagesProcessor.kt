@@ -1,7 +1,6 @@
 package dev.ragnarok.fenrir.realtime
 
 import android.content.Context
-import android.util.SparseArray
 import dev.ragnarok.fenrir.Includes.networkInterfaces
 import dev.ragnarok.fenrir.Includes.provideApplicationContext
 import dev.ragnarok.fenrir.Includes.stores
@@ -40,7 +39,7 @@ internal class RealtimeMessagesProcessor : IRealtimeMessagesProcessor {
     private val stateLock = Any()
     private val queue: MutableList<Entry>
     private val app: Context = provideApplicationContext()
-    private val notificationsInterceptors: SparseArray<Pair<Long, Long>>
+    private val notificationsInterceptors: HashMap<Long, Pair<Long, Long>>
     private val ownersRepository: IOwnersRepository
     private val messagesInteractor: IMessagesRepository
 
@@ -77,7 +76,13 @@ internal class RealtimeMessagesProcessor : IRealtimeMessagesProcessor {
     }
 
     @Throws(QueueContainsException::class)
-    override fun process(accountId: Long, messageId: Int, ignoreIfExists: Boolean): Int {
+    override fun process(
+        accountId: Long,
+        messageId: Int,
+        peerId: Long,
+        conversationMessageId: Int,
+        ignoreIfExists: Boolean
+    ): Int {
         if (hasInQueueOrCurrent(messageId)) {
             throw QueueContainsException()
         }
@@ -91,21 +96,19 @@ internal class RealtimeMessagesProcessor : IRealtimeMessagesProcessor {
     }
 
     override fun registerNotificationsInterceptor(
-        interceptorId: Int,
+        interceptorId: Long,
         aidPeerPair: Pair<Long, Long>
     ) {
-        notificationsInterceptors.put(interceptorId, aidPeerPair)
+        notificationsInterceptors[interceptorId] = aidPeerPair
     }
 
-    override fun unregisterNotificationsInterceptor(interceptorId: Int) {
+    override fun unregisterNotificationsInterceptor(interceptorId: Long) {
         notificationsInterceptors.remove(interceptorId)
     }
 
     override fun isNotificationIntercepted(accountId: Long, peerId: Long): Boolean {
-        for (i in 0 until notificationsInterceptors.size()) {
-            val key = notificationsInterceptors.keyAt(i)
-            val pair = notificationsInterceptors[key]
-            if (pair.first == accountId && pair.second == peerId) {
+        for (i in notificationsInterceptors) {
+            if (i.value.first == accountId && i.value.second == peerId) {
                 return false
             }
         }
@@ -392,7 +395,7 @@ internal class RealtimeMessagesProcessor : IRealtimeMessagesProcessor {
 
     init {
         queue = LinkedList()
-        notificationsInterceptors = SparseArray(3)
+        notificationsInterceptors = HashMap(3)
         ownersRepository = owners
         messagesInteractor = messages
     }

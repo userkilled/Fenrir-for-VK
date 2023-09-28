@@ -33,8 +33,9 @@ abstract class NoMainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(currentStyle())
         Utils.prepareDensity(this)
+        Utils.registerColorsThorVG(this)
         super.onCreate(savedInstanceState)
-        isZoomPhoto = Settings.get().other().isDo_zoom_photo
+        isZoomPhoto = Settings.get().main().isDo_zoom_photo
         setContentView(getNoMainContentView())
         val w = window
         w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)

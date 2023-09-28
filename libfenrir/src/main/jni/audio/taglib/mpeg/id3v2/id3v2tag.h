@@ -26,13 +26,12 @@
 #ifndef TAGLIB_ID3V2TAG_H
 #define TAGLIB_ID3V2TAG_H
 
-#include "tag.h"
 #include "tbytevector.h"
 #include "tstring.h"
 #include "tlist.h"
 #include "tmap.h"
 #include "taglib_export.h"
-
+#include "tag.h"
 #include "id3v2.h"
 #include "id3v2framefactory.h"
 
@@ -44,10 +43,9 @@ namespace TagLib {
 
     class Header;
     class ExtendedHeader;
-    class Footer;
 
-    typedef List<Frame *> FrameList;
-    typedef Map<ByteVector, FrameList> FrameListMap;
+    using FrameList = List<Frame *>;
+    using FrameListMap = Map<ByteVector, FrameList>;
 
     //! An abstraction for the ISO-8859-1 string to data encoding in ID3v2 tags.
 
@@ -71,12 +69,18 @@ namespace TagLib {
     public:
       Latin1StringHandler();
       virtual ~Latin1StringHandler();
+      Latin1StringHandler(const Latin1StringHandler &) = delete;
+      Latin1StringHandler &operator=(const Latin1StringHandler &) = delete;
 
       /*!
        * Decode a string from \a data.  The default implementation assumes that
        * \a data is an ISO-8859-1 (Latin1) character array.
        */
       virtual String parse(const ByteVector &data) const;
+
+    private:
+      class Latin1StringHandlerPrivate;
+      std::unique_ptr<Latin1StringHandlerPrivate> d;
     };
 
     //! The main class in the ID3v2 implementation
@@ -146,33 +150,36 @@ namespace TagLib {
        *
        * \see FrameFactory
        */
-      Tag(File *file, long tagOffset,
+      Tag(File *file, offset_t tagOffset,
           const FrameFactory *factory = FrameFactory::instance());
 
       /*!
        * Destroys this Tag instance.
        */
-      virtual ~Tag();
+      ~Tag() override;
+
+      Tag(const Tag &) = delete;
+      Tag &operator=(const Tag &) = delete;
 
       // Reimplementations.
 
-      virtual String title() const;
-      virtual String artist() const;
-      virtual String album() const;
-      virtual String comment() const;
-      virtual String genre() const;
-      virtual unsigned int year() const;
-      virtual unsigned int track() const;
+      String title() const override;
+      String artist() const override;
+      String album() const override;
+      String comment() const override;
+      String genre() const override;
+      unsigned int year() const override;
+      unsigned int track() const override;
 
-      virtual void setTitle(const String &s);
-      virtual void setArtist(const String &s);
-      virtual void setAlbum(const String &s);
-      virtual void setComment(const String &s);
-      virtual void setGenre(const String &s);
-      virtual void setYear(unsigned int i);
-      virtual void setTrack(unsigned int i);
+      void setTitle(const String &s) override;
+      void setArtist(const String &s) override;
+      void setAlbum(const String &s) override;
+      void setComment(const String &s) override;
+      void setGenre(const String &s) override;
+      void setYear(unsigned int i) override;
+      void setTrack(unsigned int i) override;
 
-      virtual bool isEmpty() const;
+      bool isEmpty() const override;
 
       /*!
        * Returns a pointer to the tag's header.
@@ -184,16 +191,6 @@ namespace TagLib {
        * extended header.
        */
       ExtendedHeader *extendedHeader() const;
-
-      /*!
-       * Returns a pointer to the tag's footer or null if there is no footer.
-       *
-       * \deprecated I don't see any reason to keep this around since there's
-       * nothing useful to be retrieved from the footer, but well, again, I'm
-       * prone to change my mind, so this gets to stay around until near a
-       * release.
-       */
-      TAGLIB_DEPRECATED Footer *footer() const;
 
       /*!
        * Returns a reference to the frame list map.  This is an FrameListMap of
@@ -311,7 +308,7 @@ namespace TagLib {
        *  once, the description, separated by a "/".
        *
        */
-      PropertyMap properties() const;
+      PropertyMap properties() const override;
 
       /*!
        * Removes unsupported frames given by \a properties. The elements of
@@ -324,23 +321,18 @@ namespace TagLib {
        *  - "UNKNOWN/" + frameID, for frames that could not be parsed by TagLib.
        *    In that case, *all* unknown frames with the given ID will be removed.
        */
-      void removeUnsupportedProperties(const StringList &properties);
+      void removeUnsupportedProperties(const StringList &properties) override;
 
       /*!
        * Implements the unified property interface -- import function.
        * See the comments in properties().
        */
-      PropertyMap setProperties(const PropertyMap &);
+      PropertyMap setProperties(const PropertyMap &) override;
 
       /*!
        * Render the tag back to binary data, suitable to be written to disk.
        */
       ByteVector render() const;
-
-      /*!
-       * \deprecated Use render(Version) const.
-       */
-      TAGLIB_DEPRECATED ByteVector render(int version) const;
 
       /*!
        * Render the tag back to binary data, suitable to be written to disk.
@@ -398,11 +390,8 @@ namespace TagLib {
       void downgradeFrames(FrameList *existingFrames, FrameList *newFrames) const;
 
     private:
-      Tag(const Tag &);
-      Tag &operator=(const Tag &);
-
       class TagPrivate;
-      TagPrivate *d;
+      std::unique_ptr<TagPrivate> d;
     };
 
   }  // namespace ID3v2

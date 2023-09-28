@@ -79,6 +79,7 @@ internal class StringJsonLexer(override val source: String) : AbstractJsonLexer(
             if (c == expected) return
             unexpectedToken(expected)
         }
+        currentPosition = -1 // for correct EOF reporting
         unexpectedToken(expected) // EOF
     }
 
@@ -91,7 +92,12 @@ internal class StringJsonLexer(override val source: String) : AbstractJsonLexer(
         consumeNextToken(STRING)
         val current = currentPosition
         val closingQuote = source.indexOf('"', current)
-        if (closingQuote == -1) fail(TC_STRING)
+        if (closingQuote == -1) {
+            // advance currentPosition to a token after the end of the string to guess position in the error msg
+            // (not always correct, as `:`/`,` are valid contents of the string, but good guess anyway)
+            consumeStringLenient()
+            fail(TC_STRING, wasConsumed = false)
+        }
         // Now we _optimistically_ know where the string ends (it might have been an escaped quote)
         for (i in current until closingQuote) {
             // Encountered escape sequence, should fallback to "slow" path and symbolic scanning
@@ -111,20 +117,19 @@ internal class StringJsonLexer(override val source: String) : AbstractJsonLexer(
             .forEach(consumeChunk)
     }
 
-    override fun consumeLeadingMatchingValue(keyToMatch: String, isLenient: Boolean): String? {
+    override fun peekLeadingMatchingValue(keyToMatch: String, isLenient: Boolean): String? {
         val positionSnapshot = currentPosition
         try {
-            // Malformed JSON, bailout
-            if (consumeNextToken() != TC_BEGIN_OBJ) return null
-            val firstKey = if (isLenient) consumeKeyString() else consumeStringLenientNotNull()
-            if (firstKey == keyToMatch) {
-                if (consumeNextToken() != TC_COLON) return null
-                return if (isLenient) consumeString() else consumeStringLenientNotNull()
-            }
-            return null
+            if (consumeNextToken() != TC_BEGIN_OBJ) return null // Malformed JSON, bailout
+            val firstKey = peekString(isLenient)
+            if (firstKey != keyToMatch) return null
+            discardPeeked() // consume firstKey
+            if (consumeNextToken() != TC_COLON) return null
+            return peekString(isLenient)
         } finally {
             // Restore the position
             currentPosition = positionSnapshot
+            discardPeeked()
         }
     }
 }

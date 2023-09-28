@@ -29,7 +29,7 @@ class CatalogV2ListPresenter(
     private val artist_id: String?,
     private val query: String?,
     private val url: String?,
-    private val context: Context,
+    context: Context,
     savedInstanceState: Bundle?
 ) : AccountDependencyPresenter<ICatalogV2ListView>(accountId, savedInstanceState) {
     private val audioInteractor: IAudioInteractor = InteractorFactory.createAudioInteractor()
@@ -37,6 +37,8 @@ class CatalogV2ListPresenter(
         ArrayList()
     private val netDisposable = CompositeDisposable()
     private var netLoadingNow = false
+
+    private val resolv = HashMap<Int, String>()
 
     fun resolveLoading() {
         view?.resolveLoading(netLoadingNow)
@@ -86,7 +88,7 @@ class CatalogV2ListPresenter(
 
     private fun onNetDataGetError(t: Throwable) {
         mSections.clear()
-        val srt = Settings.get().other().catalogV2ListSort
+        val srt = Settings.get().main().catalogV2ListSort
         for (i in srt) {
             makeByUid(i, null)
         }
@@ -108,7 +110,7 @@ class CatalogV2ListPresenter(
                 mSections.add(
                     CatalogV2List.CatalogV2ListItem(
                         TYPE_AUDIO,
-                        context.getString(R.string.my_saved)
+                        resolv[R.string.my_saved].orEmpty()
                     )
                 )
             }
@@ -124,7 +126,7 @@ class CatalogV2ListPresenter(
                     mSections.add(
                         CatalogV2List.CatalogV2ListItem(
                             TYPE_LOCAL_AUDIO,
-                            context.getString(R.string.local_audios)
+                            resolv[R.string.local_audios].orEmpty()
                         )
                     )
                 }
@@ -132,12 +134,12 @@ class CatalogV2ListPresenter(
 
             TYPE_LOCAL_SERVER_AUDIO -> {
                 if (accountId == owner_id && accountId >= 0 && Settings.get()
-                        .other().localServer.enabled
+                        .main().localServer.enabled
                 ) {
                     mSections.add(
                         CatalogV2List.CatalogV2ListItem(
                             TYPE_LOCAL_SERVER_AUDIO,
-                            context.getString(R.string.on_server)
+                            resolv[R.string.on_server].orEmpty()
                         )
                     )
                 }
@@ -147,7 +149,7 @@ class CatalogV2ListPresenter(
                 mSections.add(
                     CatalogV2List.CatalogV2ListItem(
                         TYPE_PLAYLIST,
-                        context.getString(R.string.playlists)
+                        resolv[R.string.playlists].orEmpty()
                     )
                 )
             }
@@ -156,7 +158,7 @@ class CatalogV2ListPresenter(
                 mSections.add(
                     CatalogV2List.CatalogV2ListItem(
                         TYPE_RECOMMENDATIONS,
-                        context.getString(R.string.recommendation)
+                        resolv[R.string.recommendation].orEmpty()
                     )
                 )
             }
@@ -167,7 +169,7 @@ class CatalogV2ListPresenter(
         netLoadingNow = false
         resolveLoading()
         mSections.clear()
-        val srt = Settings.get().other().catalogV2ListSort
+        val srt = Settings.get().main().catalogV2ListSort
         for (i in srt) {
             makeByUid(i, data.sections)
         }
@@ -201,6 +203,12 @@ class CatalogV2ListPresenter(
     }
 
     init {
+        resolv[R.string.my_saved] = context.getString(R.string.my_saved)
+        resolv[R.string.local_audios] = context.getString(R.string.local_audios)
+        resolv[R.string.on_server] = context.getString(R.string.on_server)
+        resolv[R.string.playlists] = context.getString(R.string.playlists)
+        resolv[R.string.recommendation] = context.getString(R.string.recommendation)
+
         request()
     }
 }

@@ -26,9 +26,10 @@
 #ifndef TAGLIB_LIST_H
 #define TAGLIB_LIST_H
 
-#include "taglib.h"
-
 #include <list>
+#include <memory>
+
+#include "taglib.h"
 
 namespace TagLib {
 
@@ -54,8 +55,8 @@ namespace TagLib {
   {
   public:
 #ifndef DO_NOT_DOCUMENT
-    typedef typename std::list<T>::iterator Iterator;
-    typedef typename std::list<T>::const_iterator ConstIterator;
+    using Iterator = typename std::list<T>::iterator;
+    using ConstIterator = typename std::list<T>::const_iterator;
 #endif
 
     /*!
@@ -74,7 +75,7 @@ namespace TagLib {
      * Destroys this List instance.  If auto deletion is enabled and this list
      * contains a pointer type all of the members are also deleted.
      */
-    virtual ~List();
+    ~List();
 
     /*!
      * Returns an STL style iterator to the beginning of the list.  See
@@ -89,6 +90,12 @@ namespace TagLib {
     ConstIterator begin() const;
 
     /*!
+     * Returns an STL style constant iterator to the beginning of the list.  See
+     * std::list::iterator for the semantics.
+     */
+    ConstIterator cbegin() const;
+
+    /*!
      * Returns an STL style iterator to the end of the list.  See
      * std::list::iterator for the semantics.
      */
@@ -101,9 +108,15 @@ namespace TagLib {
     ConstIterator end() const;
 
     /*!
-     * Inserts a copy of \a value before \a it.
+     * Returns an STL style constant iterator to the end of the list.  See
+     * std::list::const_iterator for the semantics.
      */
-    Iterator insert(Iterator it, const T &value);
+    ConstIterator cend() const;
+
+    /*!
+     * Inserts a copy of \a item before \a it.
+     */
+    Iterator insert(Iterator it, const T &item);
 
     /*!
      * Inserts the \a value into the list.  This assumes that the list is
@@ -167,6 +180,11 @@ namespace TagLib {
      * Find the first occurrence of \a value.
      */
     ConstIterator find(const T &value) const;
+
+    /*!
+     * Find the first occurrence of \a value.
+     */
+    ConstIterator cfind(const T &value) const;
 
     /*!
      * Returns true if the list contains \a value.
@@ -256,7 +274,7 @@ namespace TagLib {
   private:
 #ifndef DO_NOT_DOCUMENT
     template <class TP> class ListPrivate;
-    ListPrivate<T> *d;
+    std::shared_ptr<ListPrivate<T>> d;
 #endif
   };
 

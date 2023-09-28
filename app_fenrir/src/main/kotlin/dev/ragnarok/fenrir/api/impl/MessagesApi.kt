@@ -3,12 +3,14 @@ package dev.ragnarok.fenrir.api.impl
 import dev.ragnarok.fenrir.api.IServiceProvider
 import dev.ragnarok.fenrir.api.TokenType
 import dev.ragnarok.fenrir.api.interfaces.IMessagesApi
+import dev.ragnarok.fenrir.api.model.Assets
 import dev.ragnarok.fenrir.api.model.Items
 import dev.ragnarok.fenrir.api.model.VKApiChat
 import dev.ragnarok.fenrir.api.model.VKApiConversation
 import dev.ragnarok.fenrir.api.model.VKApiJsonString
 import dev.ragnarok.fenrir.api.model.VKApiLongpollServer
 import dev.ragnarok.fenrir.api.model.VKApiMessage
+import dev.ragnarok.fenrir.api.model.VKApiReactionAsset
 import dev.ragnarok.fenrir.api.model.interfaces.IAttachmentToken
 import dev.ragnarok.fenrir.api.model.response.AttachmentsHistoryResponse
 import dev.ragnarok.fenrir.api.model.response.ConversationDeleteResult
@@ -262,13 +264,24 @@ internal class MessagesApi(accountId: Long, provider: IServiceProvider) :
         mediaType: String?,
         startFrom: String?,
         photoSizes: Int?,
+        preserve_order: Int?,
+        max_forwards_level: Int?,
         count: Int?,
         fields: String?
     ): Single<AttachmentsHistoryResponse> {
         return serviceRx(TokenType.USER, TokenType.COMMUNITY)
             .flatMap { service ->
                 service
-                    .getHistoryAttachments(peerId, mediaType, startFrom, count, photoSizes, fields)
+                    .getHistoryAttachments(
+                        peerId,
+                        mediaType,
+                        startFrom,
+                        count,
+                        photoSizes,
+                        preserve_order,
+                        max_forwards_level,
+                        fields
+                    )
                     .map(extractResponseWithErrorHandling())
             }
     }
@@ -455,6 +468,26 @@ internal class MessagesApi(accountId: Long, provider: IServiceProvider) :
                 service
                     .searchConversations(query, count, extended, fields)
                     .map(extractResponseWithErrorHandling())
+            }
+    }
+
+    override fun getReactionsAssets(): Single<Assets<VKApiReactionAsset>> {
+        return serviceRx(TokenType.USER, TokenType.COMMUNITY)
+            .flatMap { service ->
+                service
+                    .getReactionsAssets(null)
+                    .map(extractResponseWithErrorHandling())
+            }
+    }
+
+    override fun sendOrDeleteReaction(peer_id: Long, cmid: Int, reaction_id: Int?): Single<Int> {
+        return serviceRx(TokenType.USER, TokenType.COMMUNITY)
+            .flatMap { service ->
+                if (reaction_id != null) service.sendReaction(peer_id, cmid, reaction_id)
+                    .map(extractResponseWithErrorHandling()) else service.deleteReaction(
+                    peer_id,
+                    cmid
+                ).map(extractResponseWithErrorHandling())
             }
     }
 }

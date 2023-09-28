@@ -1,7 +1,53 @@
 package dev.ragnarok.fenrir.domain.mappers
 
-import dev.ragnarok.fenrir.api.model.*
+import android.graphics.Color
+import dev.ragnarok.fenrir.api.model.FaveLinkDto
+import dev.ragnarok.fenrir.api.model.PhotoSizeDto
+import dev.ragnarok.fenrir.api.model.VKApiArticle
+import dev.ragnarok.fenrir.api.model.VKApiAttachments
+import dev.ragnarok.fenrir.api.model.VKApiAudio
+import dev.ragnarok.fenrir.api.model.VKApiAudioArtist
+import dev.ragnarok.fenrir.api.model.VKApiAudioMessage
+import dev.ragnarok.fenrir.api.model.VKApiAudioPlaylist
+import dev.ragnarok.fenrir.api.model.VKApiCall
+import dev.ragnarok.fenrir.api.model.VKApiChat
+import dev.ragnarok.fenrir.api.model.VKApiComment
+import dev.ragnarok.fenrir.api.model.VKApiCommunity
+import dev.ragnarok.fenrir.api.model.VKApiConversation
 import dev.ragnarok.fenrir.api.model.VKApiConversation.CurrentKeyboard
+import dev.ragnarok.fenrir.api.model.VKApiDialog
+import dev.ragnarok.fenrir.api.model.VKApiDoc
+import dev.ragnarok.fenrir.api.model.VKApiEvent
+import dev.ragnarok.fenrir.api.model.VKApiFriendList
+import dev.ragnarok.fenrir.api.model.VKApiGeo
+import dev.ragnarok.fenrir.api.model.VKApiGift
+import dev.ragnarok.fenrir.api.model.VKApiGiftItem
+import dev.ragnarok.fenrir.api.model.VKApiGraffiti
+import dev.ragnarok.fenrir.api.model.VKApiGroupChats
+import dev.ragnarok.fenrir.api.model.VKApiLink
+import dev.ragnarok.fenrir.api.model.VKApiMarket
+import dev.ragnarok.fenrir.api.model.VKApiMarketAlbum
+import dev.ragnarok.fenrir.api.model.VKApiMessage
+import dev.ragnarok.fenrir.api.model.VKApiNarratives
+import dev.ragnarok.fenrir.api.model.VKApiNews
+import dev.ragnarok.fenrir.api.model.VKApiNotSupported
+import dev.ragnarok.fenrir.api.model.VKApiOwner
+import dev.ragnarok.fenrir.api.model.VKApiPhoto
+import dev.ragnarok.fenrir.api.model.VKApiPhotoAlbum
+import dev.ragnarok.fenrir.api.model.VKApiPhotoTags
+import dev.ragnarok.fenrir.api.model.VKApiPoll
+import dev.ragnarok.fenrir.api.model.VKApiPost
+import dev.ragnarok.fenrir.api.model.VKApiPrivacy
+import dev.ragnarok.fenrir.api.model.VKApiReaction
+import dev.ragnarok.fenrir.api.model.VKApiReactionAsset
+import dev.ragnarok.fenrir.api.model.VKApiShortLink
+import dev.ragnarok.fenrir.api.model.VKApiSticker
+import dev.ragnarok.fenrir.api.model.VKApiStory
+import dev.ragnarok.fenrir.api.model.VKApiTopic
+import dev.ragnarok.fenrir.api.model.VKApiUser
+import dev.ragnarok.fenrir.api.model.VKApiVideo
+import dev.ragnarok.fenrir.api.model.VKApiWallReply
+import dev.ragnarok.fenrir.api.model.VKApiWikiPage
 import dev.ragnarok.fenrir.api.model.interfaces.VKApiAttachment
 import dev.ragnarok.fenrir.api.model.longpoll.AddMessageUpdate
 import dev.ragnarok.fenrir.api.model.response.FavePageResponse
@@ -11,9 +57,65 @@ import dev.ragnarok.fenrir.crypt.MessageType
 import dev.ragnarok.fenrir.db.model.entity.PostDboEntity
 import dev.ragnarok.fenrir.domain.mappers.MapUtil.calculateConversationAcl
 import dev.ragnarok.fenrir.domain.mappers.MapUtil.mapAll
-import dev.ragnarok.fenrir.model.*
+import dev.ragnarok.fenrir.model.Article
+import dev.ragnarok.fenrir.model.Attachments
+import dev.ragnarok.fenrir.model.Audio
+import dev.ragnarok.fenrir.model.AudioArtist
 import dev.ragnarok.fenrir.model.AudioArtist.AudioArtistImage
+import dev.ragnarok.fenrir.model.AudioPlaylist
+import dev.ragnarok.fenrir.model.Call
+import dev.ragnarok.fenrir.model.Chat
+import dev.ragnarok.fenrir.model.Comment
+import dev.ragnarok.fenrir.model.Commented
+import dev.ragnarok.fenrir.model.Community
+import dev.ragnarok.fenrir.model.Conversation
+import dev.ragnarok.fenrir.model.CryptStatus
+import dev.ragnarok.fenrir.model.Dialog
+import dev.ragnarok.fenrir.model.Document
 import dev.ragnarok.fenrir.model.Document.VideoPreview
+import dev.ragnarok.fenrir.model.Event
+import dev.ragnarok.fenrir.model.FaveLink
+import dev.ragnarok.fenrir.model.FavePage
+import dev.ragnarok.fenrir.model.FavePageType
+import dev.ragnarok.fenrir.model.FriendList
+import dev.ragnarok.fenrir.model.Geo
+import dev.ragnarok.fenrir.model.Gift
+import dev.ragnarok.fenrir.model.GiftItem
+import dev.ragnarok.fenrir.model.Graffiti
+import dev.ragnarok.fenrir.model.GroupChats
+import dev.ragnarok.fenrir.model.IOwnersBundle
+import dev.ragnarok.fenrir.model.Keyboard
+import dev.ragnarok.fenrir.model.Link
+import dev.ragnarok.fenrir.model.Market
+import dev.ragnarok.fenrir.model.MarketAlbum
+import dev.ragnarok.fenrir.model.Message
+import dev.ragnarok.fenrir.model.MessageStatus
+import dev.ragnarok.fenrir.model.Narratives
+import dev.ragnarok.fenrir.model.News
+import dev.ragnarok.fenrir.model.NotSupported
+import dev.ragnarok.fenrir.model.Owner
+import dev.ragnarok.fenrir.model.OwnerType
+import dev.ragnarok.fenrir.model.Peer
+import dev.ragnarok.fenrir.model.Photo
+import dev.ragnarok.fenrir.model.PhotoAlbum
+import dev.ragnarok.fenrir.model.PhotoSizes
+import dev.ragnarok.fenrir.model.PhotoTags
+import dev.ragnarok.fenrir.model.Poll
+import dev.ragnarok.fenrir.model.Post
+import dev.ragnarok.fenrir.model.PostSource
+import dev.ragnarok.fenrir.model.Privacy
+import dev.ragnarok.fenrir.model.Reaction
+import dev.ragnarok.fenrir.model.ReactionAsset
+import dev.ragnarok.fenrir.model.ShortLink
+import dev.ragnarok.fenrir.model.SimplePrivacy
+import dev.ragnarok.fenrir.model.Sticker
+import dev.ragnarok.fenrir.model.Story
+import dev.ragnarok.fenrir.model.Topic
+import dev.ragnarok.fenrir.model.User
+import dev.ragnarok.fenrir.model.Video
+import dev.ragnarok.fenrir.model.VoiceMessage
+import dev.ragnarok.fenrir.model.WallReply
+import dev.ragnarok.fenrir.model.WikiPage
 import dev.ragnarok.fenrir.nonNullNoEmpty
 import dev.ragnarok.fenrir.orZero
 import dev.ragnarok.fenrir.requireNonNull
@@ -50,11 +152,12 @@ object Dto2Model {
             .setTitle(chat.title)
     }
 
-    fun transform(narrative: VKApiNarratives): Narratives {
+    fun transformNarrative(narrative: VKApiNarratives): Narratives {
         return Narratives(narrative.id, narrative.owner_id)
             .setTitle(narrative.title)
             .setCover(narrative.cover)
             .setStory_ids(narrative.story_ids)
+            .setAccessKey(narrative.access_key)
     }
 
     fun transformOwner(owner: VKApiOwner?): Owner? {
@@ -193,6 +296,11 @@ object Dto2Model {
         return page
     }
 
+    fun transformReactionAsset(dto: VKApiReactionAsset): ReactionAsset {
+        return ReactionAsset().setReactionId(dto.reaction_id)
+            .setBigAnimation(dto.big_animation).setSmallAnimation(dto.small_animation)
+            .setStatic(dto.static)
+    }
 
     fun transformUser(user: VKApiUser): User {
         return User(user.id)
@@ -245,6 +353,7 @@ object Dto2Model {
         message.keyboard = update.keyboard
         message.payload = update.payload
         message.update_time = update.edit_time
+        message.conversation_message_id = update.conversationMessageId
         return message
     }
 
@@ -431,6 +540,15 @@ object Dto2Model {
         } else null
     }
 
+    fun transform(dto: VKApiReaction): Reaction {
+        return Reaction().setReactionId(dto.reaction_id).setCount(dto.count)
+    }
+
+    fun transform(dto: VKApiReactionAsset): ReactionAsset {
+        return ReactionAsset().setReactionId(dto.reaction_id).setBigAnimation(dto.big_animation)
+            .setSmallAnimation(dto.small_animation)
+            .setStatic(dto.static)
+    }
 
     fun transform(aid: Long, message: VKApiMessage, owners: IOwnersBundle): Message {
         val encrypted = analizeMessageBody(message.body) == MessageType.CRYPTED
@@ -459,12 +577,20 @@ object Dto2Model {
             .setSender(owners.getById(message.from_id))
             .setPayload(message.payload)
             .setKeyboard(transformKeyboard(message.keyboard))
+            .setUpdateTime(message.update_time)
+            .setConversationMessageId(message.conversation_message_id)
+            .setReactionId(message.reaction_id)
         if (message.action_mid != 0L) {
             appMessage.setActionUser(owners.getById(message.action_mid))
         }
         if (message.attachments != null && message.attachments?.nonEmpty() == true) {
             message.attachments?.let {
                 appMessage.setAttachments(buildAttachments(it, owners))
+            }
+        }
+        message.reactions.nonNullNoEmpty {
+            for (react in it) {
+                appMessage.prepareReactions(it.size).add(transform(react))
             }
         }
         message.fwd_messages.nonNullNoEmpty {
@@ -527,6 +653,8 @@ object Dto2Model {
                     PhotoSizeDto.Type.P -> sizes.setP(dto2model(dto))
                     PhotoSizeDto.Type.Q -> sizes.setQ(dto2model(dto))
                     PhotoSizeDto.Type.R -> sizes.setR(dto2model(dto))
+                    PhotoSizeDto.Type.K -> sizes.setK(dto2model(dto))
+                    PhotoSizeDto.Type.L -> sizes.setL(dto2model(dto))
                 }
             }
         }
@@ -657,6 +785,30 @@ object Dto2Model {
         return url
     }
 
+    fun buildPollBackgroundGradient(background: VKApiPoll.Background?): Poll.PollBackground? {
+        if (background == null || background.type != "gradient") {
+            return null
+        }
+        val list = ArrayList<Poll.PollBackgroundPoint>()
+        for (i in background.points.orEmpty()) {
+            if (i.color.nonNullNoEmpty()) {
+                try {
+                    list.add(
+                        Poll.PollBackgroundPoint().setColor(Color.parseColor("#" + i.color))
+                            .setPosition(i.position)
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    continue
+                }
+            }
+        }
+        if (list.isEmpty()) {
+            return null
+        }
+        return Poll.PollBackground(background.id).setName(background.name)
+            .setAngle(background.angle).setPoints(list)
+    }
 
     fun transform(dto: VKApiPoll): Poll {
         val answers: MutableList<Poll.Answer> = ArrayList(safeCountOf(dto.answers))
@@ -687,6 +839,7 @@ object Dto2Model {
             .setEndDate(dto.end_date)
             .setMultiple(dto.multiple)
             .setPhoto(buildPollPhoto(dto.photo))
+            .setBackground(buildPollBackgroundGradient(dto.background))
     }
 
 
@@ -1011,6 +1164,17 @@ object Dto2Model {
         return document;
     }*/
 
+    fun transform(dto: VKApiVideo.VKApiVideoTimeline): Video.VideoTimeline {
+        return Video.VideoTimeline().setCountPerImage(dto.count_per_image)
+            .setCountPerRow(dto.count_per_row)
+            .setCountTotal(dto.count_total)
+            .setFrameHeight(dto.frame_height.toInt())
+            .setFrameWidth(dto.frame_width.toInt())
+            .setFrequency(dto.frequency.toInt())
+            .setIsUv(dto.is_uv)
+            .setLinks(dto.links)
+    }
+
     fun transform(dto: VKApiVideo): Video {
         return Video()
             .setId(dto.id)
@@ -1049,6 +1213,8 @@ object Dto2Model {
             .setCanAdd(dto.can_add)
             .setPrivate(dto.is_private)
             .setFavorite(dto.is_favorite)
+            .setTrailer(dto.trailer)
+            .setTimelineThumbs(dto.timeline_thumbs?.let { transform(it) })
     }
 
     fun transform(dto: VKApiWikiPage): WikiPage {
@@ -1101,6 +1267,9 @@ object Dto2Model {
 
                 VKApiAttachment.TYPE_STORY -> attachments.prepareStories()
                     .add(transformStory(attachment as VKApiStory, owners))
+
+                VKApiAttachment.TYPE_NARRATIVE -> attachments.prepareNarratives()
+                    .add(transformNarrative(attachment as VKApiNarratives))
 
                 VKApiAttachment.TYPE_ALBUM -> attachments.preparePhotoAlbums().add(
                     transform(attachment as VKApiPhotoAlbum)

@@ -41,6 +41,7 @@ import dev.ragnarok.fenrir.model.Link
 import dev.ragnarok.fenrir.model.Market
 import dev.ragnarok.fenrir.model.MarketAlbum
 import dev.ragnarok.fenrir.model.Message
+import dev.ragnarok.fenrir.model.Narratives
 import dev.ragnarok.fenrir.model.Peer
 import dev.ragnarok.fenrir.model.Photo
 import dev.ragnarok.fenrir.model.PhotoAlbum
@@ -58,6 +59,7 @@ import dev.ragnarok.fenrir.place.PlaceFactory
 import dev.ragnarok.fenrir.settings.CurrentTheme
 import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.settings.theme.ThemeOverlay
+import dev.ragnarok.fenrir.toMainThread
 import dev.ragnarok.fenrir.util.AppPerms.requestPermissionsAbs
 import dev.ragnarok.fenrir.util.AppTextUtils
 import dev.ragnarok.fenrir.util.TextingNotifier
@@ -135,6 +137,7 @@ class QuickAnswerActivity : AppCompatActivity() {
             .setVgVideos(attachmentsRoot.findViewById(R.id.video_attachments))
             .setVgDocs(attachmentsRoot.findViewById(R.id.docs_attachments))
             .setVgArticles(attachmentsRoot.findViewById(R.id.articles_attachments))
+            .setVgBigLinks(attachmentsRoot.findViewById(R.id.biglinks_attachments))
             .setVgPhotos(attachmentsRoot.findViewById(R.id.photo_attachments))
             .setVgPosts(attachmentsRoot.findViewById(R.id.posts_attachments))
             .setVoiceMessageRoot(attachmentsRoot.findViewById(R.id.voice_message_attachments))
@@ -174,7 +177,11 @@ class QuickAnswerActivity : AppCompatActivity() {
                 AttachmentsViewBinder(this, object : OnAttachmentsActionCallback {
                     override fun onPollOpen(poll: Poll) {}
                     override fun onVideoPlay(video: Video) {}
-                    override fun onAudioPlay(position: Int, audios: ArrayList<Audio>) {
+                    override fun onAudioPlay(
+                        position: Int,
+                        audios: ArrayList<Audio>,
+                        holderPosition: Int?
+                    ) {
                         startForPlayList(this@QuickAnswerActivity, audios, position, false)
                     }
 
@@ -203,6 +210,8 @@ class QuickAnswerActivity : AppCompatActivity() {
                     }
 
                     override fun onStoryOpen(story: Story) {}
+                    override fun onNarrativeOpen(narratives: Narratives) {}
+
                     override fun onWallReplyOpen(reply: WallReply) {}
                     override fun onAudioPlaylistOpen(playlist: AudioPlaylist) {}
                     override fun onPhotoAlbumOpen(album: PhotoAlbum) {}
@@ -245,7 +254,7 @@ class QuickAnswerActivity : AppCompatActivity() {
                 attachmentsHolder,
                 true,
                 msg.getObjectId(),
-                msg.peerId
+                msg.peerId, null
             )
             attachmentsViewBinder.displayForwards(msg.fwd, forwardMessagesRoot, true)
         }
@@ -282,6 +291,7 @@ class QuickAnswerActivity : AppCompatActivity() {
         mLiveSubscription.add(
             Observable.just(Any())
                 .delay(1, TimeUnit.MINUTES)
+                .toMainThread()
                 .subscribe { finish() })
     }
 

@@ -4,7 +4,13 @@ import android.os.Parcel
 import android.os.Parcelable
 import androidx.annotation.IntDef
 import dev.ragnarok.fenrir.api.model.catalog_v2_audio.VKApiCatalogV2Layout
-import dev.ragnarok.fenrir.fragment.audio.catalog_v2.sections.holders.*
+import dev.ragnarok.fenrir.fragment.audio.catalog_v2.sections.holders.ArtistBannerViewHolder
+import dev.ragnarok.fenrir.fragment.audio.catalog_v2.sections.holders.ButtonsViewHolder
+import dev.ragnarok.fenrir.fragment.audio.catalog_v2.sections.holders.HeaderViewHolder
+import dev.ragnarok.fenrir.fragment.audio.catalog_v2.sections.holders.LinkViewHolder
+import dev.ragnarok.fenrir.fragment.audio.catalog_v2.sections.holders.SeparatorViewHolder
+import dev.ragnarok.fenrir.fragment.audio.catalog_v2.sections.holders.VideoViewHolder
+import dev.ragnarok.fenrir.fragment.audio.catalog_v2.sections.holders.ViewHolderFabric
 import dev.ragnarok.fenrir.model.AbsModelType
 
 class CatalogV2Layout : Parcelable {
@@ -15,7 +21,13 @@ class CatalogV2Layout : Parcelable {
     var title: String? = null
         private set
 
+    var topTittleIcon: String? = null
+        private set
+    var topTittleText: String? = null
+        private set
+
     @IntDef(
+        CATALOG_V2_HOLDER.TYPE_CATALOG_BUTTONS,
         CATALOG_V2_HOLDER.TYPE_CATALOG_HEADER,
         CATALOG_V2_HOLDER.TYPE_CATALOG_SEPARATOR,
         CATALOG_V2_HOLDER.TYPE_CATALOG_SLIDER,
@@ -29,6 +41,7 @@ class CatalogV2Layout : Parcelable {
     )
     annotation class CATALOG_V2_HOLDER {
         companion object {
+            const val TYPE_CATALOG_BUTTONS = -8
             const val TYPE_CATALOG_HEADER = -7
             const val TYPE_CATALOG_SEPARATOR = -6
             const val TYPE_CATALOG_SLIDER = -5
@@ -41,7 +54,11 @@ class CatalogV2Layout : Parcelable {
 
     fun getViewHolderType(): Int {
         return when (name) {
-            "header", "header_extended", "header_compact", "horizontal_buttons" -> {
+            "horizontal_buttons" -> {
+                CATALOG_V2_HOLDER.TYPE_CATALOG_BUTTONS
+            }
+
+            "header", "header_extended", "header_compact" -> {
                 CATALOG_V2_HOLDER.TYPE_CATALOG_HEADER
             }
 
@@ -85,16 +102,26 @@ class CatalogV2Layout : Parcelable {
         name = object_v.name
         title = object_v.title
         this.data_type = data_type
+        object_v.top_title?.let {
+            topTittleIcon = it.icon
+            topTittleText = it.text
+        }
     }
 
     constructor(parcel: Parcel) {
         name = parcel.readString()
         title = parcel.readString()
+        data_type = parcel.readString()
+        topTittleIcon = parcel.readString()
+        topTittleText = parcel.readString()
     }
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
         parcel.writeString(name)
         parcel.writeString(title)
+        parcel.writeString(data_type)
+        parcel.writeString(topTittleIcon)
+        parcel.writeString(topTittleText)
     }
 
     override fun describeContents(): Int {
@@ -122,6 +149,10 @@ class CatalogV2Layout : Parcelable {
 
                 CATALOG_V2_HOLDER.TYPE_CATALOG_HEADER -> {
                     HeaderViewHolder.Fabric()
+                }
+
+                CATALOG_V2_HOLDER.TYPE_CATALOG_BUTTONS -> {
+                    ButtonsViewHolder.Fabric()
                 }
 
                 CATALOG_V2_HOLDER.TYPE_CATALOG_SEPARATOR -> {

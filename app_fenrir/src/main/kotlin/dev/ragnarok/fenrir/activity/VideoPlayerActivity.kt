@@ -8,7 +8,9 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
@@ -23,7 +25,12 @@ import androidx.annotation.ColorInt
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.customview.widget.ViewDragHelper.STATE_IDLE
+import com.squareup.picasso3.BitmapTarget
+import com.squareup.picasso3.Picasso
 import dev.ragnarok.fenrir.*
 import dev.ragnarok.fenrir.Includes.proxySettings
 import dev.ragnarok.fenrir.activity.SwipebleActivity.Companion.applyIntent
@@ -38,6 +45,8 @@ import dev.ragnarok.fenrir.model.Commented
 import dev.ragnarok.fenrir.model.InternalVideoSize
 import dev.ragnarok.fenrir.model.Video
 import dev.ragnarok.fenrir.model.VideoSize
+import dev.ragnarok.fenrir.picasso.PicassoInstance
+import dev.ragnarok.fenrir.picasso.transforms.CropTransformation
 import dev.ragnarok.fenrir.place.PlaceFactory
 import dev.ragnarok.fenrir.push.OwnerInfo
 import dev.ragnarok.fenrir.settings.CurrentTheme
@@ -48,13 +57,16 @@ import dev.ragnarok.fenrir.util.Utils
 import dev.ragnarok.fenrir.util.toast.CustomToast
 import dev.ragnarok.fenrir.view.ExpandableSurfaceView
 import dev.ragnarok.fenrir.view.VideoControllerView
+import dev.ragnarok.fenrir.view.natives.animation.AnimatedShapeableImageView
 import io.reactivex.rxjava3.disposables.CompositeDisposable
+import kotlin.math.floor
 
 class VideoPlayerActivity : AppCompatActivity(), SurfaceHolder.Callback,
     VideoControllerView.MediaPlayerControl, IVideoPlayer.IVideoSizeChangeListener, AppStyleable {
     private val mCompositeDisposable = CompositeDisposable()
     private var mDecorView: View? = null
     private var mPlaySpeed: ImageView? = null
+    private var mItemTimelineImage: AnimatedShapeableImageView? = null
     private var mControllerView: VideoControllerView? = null
     private var mSurfaceView: ExpandableSurfaceView? = null
     private var mPlayer: IVideoPlayer? = null
@@ -148,6 +160,7 @@ class VideoPlayerActivity : AppCompatActivity(), SurfaceHolder.Callback,
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(currentStyle())
         Utils.prepareDensity(this)
+        Utils.registerColorsThorVG(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_video)
         val surfaceContainer = findViewById<ViewGroup>(R.id.videoSurfaceContainer)
@@ -192,7 +205,8 @@ class VideoPlayerActivity : AppCompatActivity(), SurfaceHolder.Callback,
         }
         mControllerView = VideoControllerView(this)
         mSurfaceView = findViewById(R.id.videoSurface)
-        if (Settings.get().other().isVideo_swipes) {
+        mItemTimelineImage = findViewById(R.id.item_timeline_image)
+        if (Settings.get().main().isVideo_swipes) {
             attach(
                 this,
                 SlidrConfig.Builder().setAlphaForView(false).fromUnColoredToColoredStatusBar(true)
@@ -233,8 +247,7 @@ class VideoPlayerActivity : AppCompatActivity(), SurfaceHolder.Callback,
                         }
 
                         override fun onSlideClosed(): Boolean {
-                            finish()
-                            overridePendingTransition(0, 0)
+                            Utils.finishActivityImmediate(this@VideoPlayerActivity)
                             return true
                         }
 
@@ -268,7 +281,7 @@ class VideoPlayerActivity : AppCompatActivity(), SurfaceHolder.Callback,
             )
         }
         mControllerView?.setMediaPlayer(this)
-        if (Settings.get().other().isVideo_controller_to_decor) {
+        if (Settings.get().main().isVideo_controller_to_decor) {
             mControllerView?.setAnchorView(mDecorView as ViewGroup?, true)
         } else {
             mControllerView?.setAnchorView(findViewById(R.id.panel), false)
@@ -297,26 +310,38 @@ class VideoPlayerActivity : AppCompatActivity(), SurfaceHolder.Callback,
         )
     }
 
-    @Suppress("DEPRECATION")
     private fun resolveControlsVisibility() {
         val actionBar = supportActionBar ?: return
         if (actionBar.isShowing) {
             actionBar.hide()
             mControllerView?.hide()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) mDecorView?.layoutParams =
-                WindowManager.LayoutParams(WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES)
-            mDecorView?.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_IMMERSIVE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                mDecorView?.layoutParams =
+                    WindowManager.LayoutParams(WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES)
+            }
+
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            mDecorView?.let {
+                WindowInsetsControllerCompat(window, it).let { controller ->
+                    controller.hide(WindowInsetsCompat.Type.systemBars())
+                    controller.systemBarsBehavior =
+                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            }
         } else {
             actionBar.show()
             mControllerView?.show()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) mDecorView?.layoutParams =
-                WindowManager.LayoutParams(WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT)
-            mDecorView?.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                mDecorView?.layoutParams =
+                    WindowManager.LayoutParams(WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT)
+            }
+            WindowCompat.setDecorFitsSystemWindows(window, true)
+            mDecorView?.let {
+                WindowInsetsControllerCompat(
+                    window,
+                    it
+                ).show(WindowInsetsCompat.Type.systemBars())
+            }
         }
     }
 
@@ -325,7 +350,6 @@ class VideoPlayerActivity : AppCompatActivity(), SurfaceHolder.Callback,
         super.onDestroy()
     }
 
-    @Suppress("DEPRECATION")
     override fun onResume() {
         super.onResume()
         ActivityFeatures.Builder()
@@ -340,14 +364,19 @@ class VideoPlayerActivity : AppCompatActivity(), SurfaceHolder.Callback,
             actionBar.hide()
             mControllerView?.hide()
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) mDecorView?.layoutParams =
-            WindowManager.LayoutParams(WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES)
-        mDecorView?.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_IMMERSIVE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            mDecorView?.layoutParams =
+                WindowManager.LayoutParams(WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES)
+        }
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        mDecorView?.let {
+            WindowInsetsControllerCompat(window, it).let { controller ->
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -491,6 +520,75 @@ class VideoPlayerActivity : AppCompatActivity(), SurfaceHolder.Callback,
         }
     }
 
+    override fun hideActionBar() {
+        val actionBar = supportActionBar ?: return
+        actionBar.hide()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            mDecorView?.layoutParams =
+                WindowManager.LayoutParams(WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES)
+        }
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        mDecorView?.let {
+            WindowInsetsControllerCompat(window, it).let { controller ->
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        }
+    }
+
+    private val targetTimeline = object : BitmapTarget {
+        override fun onBitmapLoaded(bitmap: Bitmap, from: Picasso.LoadedFrom) {
+            if (!isFinishing) {
+                mItemTimelineImage?.setImageBitmap(bitmap)
+            }
+        }
+
+        override fun onPrepareLoad(placeHolderDrawable: Drawable?) {
+        }
+
+        override fun onBitmapFailed(e: Exception, errorDrawable: Drawable?) {
+            if (!isFinishing) {
+                mItemTimelineImage?.setImageDrawable(null)
+            }
+        }
+    }
+
+    private var p = Pair(0, 0)
+
+    override fun onScrolling(position: Long) {
+        video?.timelineThumbs?.let {
+            mItemTimelineImage?.let { si ->
+                if (it.isUv && it.links.nonNullNoEmpty()) {
+                    val k = position.toDouble() / it.frequency / 1000
+                    val index =
+                        Utils.clamp((k / it.countPerImage).toInt(), 0, it.links?.size.orZero() - 1)
+                    val x = it.frameWidth * (k % it.countPerRow).toInt()
+                    val y = it.frameHeight * floor((k % it.countPerImage / it.countPerRow)).toInt()
+
+                    if (p.first != x || p.second != y) {
+                        p = Pair(x, y)
+                        si.visibility = View.VISIBLE
+                        PicassoInstance.with().cancelRequest(targetTimeline)
+
+                        it.links?.get(index)?.nonNullNoEmpty { vi ->
+                            PicassoInstance.with()
+                                .load(vi)
+                                .tag(Constants.PICASSO_TAG)
+                                .transform(CropTransformation(x, y, it.frameWidth, it.frameHeight))
+                                .into(targetTimeline)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onScrollingStop() {
+        mItemTimelineImage?.visibility = View.GONE
+    }
+
     private val fileUrl: String
         get() = when (size) {
             InternalVideoSize.SIZE_240 -> video?.mp4link240 ?: run { finish(); return "null" }
@@ -529,31 +627,17 @@ class VideoPlayerActivity : AppCompatActivity(), SurfaceHolder.Callback,
         val statusbarNonColored = CurrentTheme.getStatusBarNonColored(this)
         val statusbarColored = CurrentTheme.getStatusBarColor(this)
         val w = window
-        w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-        w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         w.statusBarColor = if (colored) statusbarColored else statusbarNonColored
         @ColorInt val navigationColor =
             if (colored) CurrentTheme.getNavigationBarColor(this) else Color.BLACK
         w.navigationBarColor = navigationColor
-        if (Utils.hasMarshmallow()) {
-            var flags = window.decorView.systemUiVisibility
-            flags = if (invertIcons) {
-                flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-            } else {
-                flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-            }
-            window.decorView.systemUiVisibility = flags
-        }
-        if (Utils.hasOreo()) {
-            var flags = window.decorView.systemUiVisibility
-            if (invertIcons) {
-                flags = flags or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-                w.decorView.systemUiVisibility = flags
-                w.navigationBarColor = Color.WHITE
-            } else {
-                flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
-                w.decorView.systemUiVisibility = flags
-            }
+        val ins = WindowInsetsControllerCompat(w, w.decorView)
+        ins.isAppearanceLightStatusBars = invertIcons
+        ins.isAppearanceLightNavigationBars = invertIcons
+
+        if (!Utils.hasMarshmallow()) {
+            w.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+            w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         }
     }
 

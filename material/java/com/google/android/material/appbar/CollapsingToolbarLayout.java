@@ -61,6 +61,7 @@ import androidx.core.view.GravityCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import com.google.android.material.animation.AnimationUtils;
+import com.google.android.material.color.MaterialColors;
 import com.google.android.material.elevation.ElevationOverlayProvider;
 import com.google.android.material.internal.CollapsingTextHelper;
 import com.google.android.material.internal.DescendantOffsetUtils;
@@ -109,13 +110,22 @@ import java.lang.annotation.RetentionPolicy;
  * view' to the Toolbar which allows us to work out the available space for the title. This can
  * interfere with any views which you add.
  *
- * @attr ref com.google.android.material.R.styleable#CollapsingToolbarLayout_collapsedTitleTextAppearance
- * @attr ref com.google.android.material.R.styleable#CollapsingToolbarLayout_expandedTitleTextAppearance
+ * <p>For more information, see the <a
+ * href="https://github.com/material-components/material-components-android/blob/master/docs/components/TopAppBar.md">component
+ * developer guidance</a> and <a href="https://material.io/components/top-app-bar/overview">design
+ * guidelines</a>.
+ *
+ * @attr ref
+ *     com.google.android.material.R.styleable#CollapsingToolbarLayout_collapsedTitleTextAppearance
+ * @attr ref
+ *     com.google.android.material.R.styleable#CollapsingToolbarLayout_expandedTitleTextAppearance
  * @attr ref com.google.android.material.R.styleable#CollapsingToolbarLayout_contentScrim
  * @attr ref com.google.android.material.R.styleable#CollapsingToolbarLayout_expandedTitleMargin
- * @attr ref com.google.android.material.R.styleable#CollapsingToolbarLayout_expandedTitleMarginStart
+ * @attr ref
+ *     com.google.android.material.R.styleable#CollapsingToolbarLayout_expandedTitleMarginStart
  * @attr ref com.google.android.material.R.styleable#CollapsingToolbarLayout_expandedTitleMarginEnd
- * @attr ref com.google.android.material.R.styleable#CollapsingToolbarLayout_expandedTitleMarginBottom
+ * @attr ref
+ *     com.google.android.material.R.styleable#CollapsingToolbarLayout_expandedTitleMarginBottom
  * @attr ref com.google.android.material.R.styleable#CollapsingToolbarLayout_statusBarScrim
  * @attr ref com.google.android.material.R.styleable#CollapsingToolbarLayout_toolbarId
  */
@@ -787,13 +797,22 @@ public class CollapsingToolbarLayout extends FrameLayout {
       disableLiftOnScrollIfNeeded((AppBarLayout) parent);
     }
 
-    // If using fade title collapse mode and no content scrim, provide default content scrim based
-    // on elevation overlay.
+    // If using fade title collapse mode and no content scrim, provide default content scrim.
     if (fadeModeEnabled && contentScrim == null) {
+      setContentScrimColor(getDefaultContentScrimColorForTitleCollapseFadeMode());
+    }
+  }
+
+  @ColorInt
+  private int getDefaultContentScrimColorForTitleCollapseFadeMode() {
+    ColorStateList colorSurfaceContainer =
+        MaterialColors.getColorStateListOrNull(getContext(), R.attr.colorSurfaceContainer);
+    if (colorSurfaceContainer != null) {
+      return colorSurfaceContainer.getDefaultColor();
+    } else {
       float appBarElevation = getResources().getDimension(R.dimen.design_appbar_elevation);
-      int scrimColor =
-          elevationOverlayProvider.compositeOverlayWithThemeSurfaceColorIfNeeded(appBarElevation);
-      setContentScrimColor(scrimColor);
+      return elevationOverlayProvider.compositeOverlayWithThemeSurfaceColorIfNeeded(
+          appBarElevation);
     }
   }
 

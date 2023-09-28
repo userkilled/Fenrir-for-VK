@@ -18,13 +18,19 @@ import dev.ragnarok.fenrir.activity.ActivityUtils.supportToolbarFor
 import dev.ragnarok.fenrir.fragment.base.BaseFragment
 import dev.ragnarok.fenrir.fragment.base.BaseMvpFragment
 import dev.ragnarok.fenrir.fragment.filemanagerselect.FileManagerSelectFragment
-import dev.ragnarok.fenrir.fragment.localimagealbums.LocalImageAlbumsFragment
-import dev.ragnarok.fenrir.fragment.localphotos.LocalPhotosFragment
-import dev.ragnarok.fenrir.fragment.localvideos.LocalVideosFragment
-import dev.ragnarok.fenrir.fragment.vkphotoalbums.VKPhotoAlbumsFragment
+import dev.ragnarok.fenrir.fragment.photos.localimagealbums.LocalImageAlbumsFragment
+import dev.ragnarok.fenrir.fragment.photos.localphotos.LocalPhotosFragment
+import dev.ragnarok.fenrir.fragment.photos.vkphotoalbums.VKPhotoAlbumsFragment
+import dev.ragnarok.fenrir.fragment.videos.localvideos.LocalVideosFragment
 import dev.ragnarok.fenrir.getParcelableCompat
 import dev.ragnarok.fenrir.listener.BackPressCallback
-import dev.ragnarok.fenrir.model.selection.*
+import dev.ragnarok.fenrir.model.selection.FileManagerSelectableSource
+import dev.ragnarok.fenrir.model.selection.LocalGallerySelectableSource
+import dev.ragnarok.fenrir.model.selection.LocalPhotosSelectableSource
+import dev.ragnarok.fenrir.model.selection.LocalVideosSelectableSource
+import dev.ragnarok.fenrir.model.selection.Sources
+import dev.ragnarok.fenrir.model.selection.Types
+import dev.ragnarok.fenrir.model.selection.VKPhotosSelectableSource
 import dev.ragnarok.fenrir.settings.Settings
 import dev.ragnarok.fenrir.util.Utils.createPageTransform
 

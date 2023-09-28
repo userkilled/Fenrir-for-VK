@@ -30,10 +30,13 @@ import androidx.annotation.IntDef
     AbsModelType.MODEL_PHOTO_ALBUM,
     AbsModelType.MODEL_POLL,
     AbsModelType.MODEL_POLL_ANSWER,
+    AbsModelType.MODEL_POLL_BACKGROUND,
+    AbsModelType.MODEL_POLL_BACKGROUND_POINT,
     AbsModelType.MODEL_POST,
     AbsModelType.MODEL_SHORT_LINK,
     AbsModelType.MODEL_STICKER,
     AbsModelType.MODEL_STORY,
+    AbsModelType.MODEL_NARRATIVE,
     AbsModelType.MODEL_TOPIC,
     AbsModelType.MODEL_USER,
     AbsModelType.MODEL_VIDEO,
@@ -45,7 +48,8 @@ import androidx.annotation.IntDef
     AbsModelType.MODEL_UPLOAD,
     AbsModelType.MODEL_GEO,
     AbsModelType.MODEL_CATALOG_V2_BLOCK,
-    AbsModelType.MODEL_CATALOG_V2_LINK
+    AbsModelType.MODEL_CATALOG_V2_LINK,
+    AbsModelType.MODEL_CATALOG_V2_RECOMMENDATION_PLAYLIST
 )
 @Retention(
     AnnotationRetention.SOURCE
@@ -79,21 +83,25 @@ annotation class AbsModelType {
         const val MODEL_PHOTO_ALBUM = 24
         const val MODEL_POLL = 25
         const val MODEL_POLL_ANSWER = 26
-        const val MODEL_POST = 27
-        const val MODEL_SHORT_LINK = 28
-        const val MODEL_STICKER = 29
-        const val MODEL_STORY = 30
-        const val MODEL_TOPIC = 31
-        const val MODEL_USER = 32
-        const val MODEL_VIDEO = 33
-        const val MODEL_VIDEO_ALBUM = 34
-        const val MODEL_VOICE_MESSAGE = 35
-        const val MODEL_WALL_REPLY = 36
-        const val MODEL_WIKI_PAGE = 37
-        const val MODEL_AUDIO_CATALOG_V2_ARTIST = 38
-        const val MODEL_UPLOAD = 39
-        const val MODEL_GEO = 40
-        const val MODEL_CATALOG_V2_BLOCK = 41
-        const val MODEL_CATALOG_V2_LINK = 42
+        const val MODEL_POLL_BACKGROUND = 27
+        const val MODEL_POLL_BACKGROUND_POINT = 28
+        const val MODEL_POST = 29
+        const val MODEL_SHORT_LINK = 30
+        const val MODEL_STICKER = 31
+        const val MODEL_STORY = 32
+        const val MODEL_NARRATIVE = 33
+        const val MODEL_TOPIC = 34
+        const val MODEL_USER = 35
+        const val MODEL_VIDEO = 36
+        const val MODEL_VIDEO_ALBUM = 37
+        const val MODEL_VOICE_MESSAGE = 38
+        const val MODEL_WALL_REPLY = 39
+        const val MODEL_WIKI_PAGE = 40
+        const val MODEL_AUDIO_CATALOG_V2_ARTIST = 41
+        const val MODEL_UPLOAD = 42
+        const val MODEL_GEO = 43
+        const val MODEL_CATALOG_V2_BLOCK = 44
+        const val MODEL_CATALOG_V2_LINK = 45
+        const val MODEL_CATALOG_V2_RECOMMENDATION_PLAYLIST = 46
     }
 }

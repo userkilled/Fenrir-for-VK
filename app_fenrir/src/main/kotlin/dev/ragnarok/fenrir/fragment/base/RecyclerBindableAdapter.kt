@@ -78,6 +78,10 @@ abstract class RecyclerBindableAdapter<T, VH : RecyclerView.ViewHolder>(private 
         notifyItemRangeChanged(positionStart, itemCount)
     }
 
+    fun notifyItemBindableRangeRemoved(position: Int, count: Int) {
+        notifyItemRangeRemoved(position + headersCount, count)
+    }
+
     fun notifyItemBindableRangeInserted(position: Int, count: Int) {
         notifyItemRangeInserted(position + headersCount, count)
     }
@@ -200,8 +204,12 @@ abstract class RecyclerBindableAdapter<T, VH : RecyclerView.ViewHolder>(private 
         }
 
         //empty out our FrameLayout and replace with our header/footer
-        (vh.itemView as ViewGroup).removeAllViews()
-        vh.itemView.addView(view)
+        (vh.itemView as ViewGroup).let {
+            if (it.childCount > 0) {
+                it.removeAllViews()
+            }
+            it.addView(view)
+        }
     }
 
     private fun isHeader(position: Int): Boolean {
